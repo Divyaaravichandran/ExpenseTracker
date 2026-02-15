@@ -1,13 +1,14 @@
 import axios from "axios";
 
+const baseURL = (import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL || "http://localhost:4000";
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:4000",
+  baseURL,
   headers: {
     "Content-Type": "application/json"
   }
 });
 
-// Automatically attach JWT for protected routes.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
