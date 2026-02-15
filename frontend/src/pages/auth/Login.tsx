@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { login } from "../../services/auth.service";
 import { validateEmail, validateLoginPassword } from "../../utils/authValidation";
 import "./auth.css";
 
 const Login = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,6 +48,9 @@ const Login = () => {
       const data = await login(email.trim().toLowerCase(), password);
       localStorage.setItem("token", data.token);
       setSuccess("Welcome back. You are logged in.");
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Login failed. Please try again.");
     } finally {
