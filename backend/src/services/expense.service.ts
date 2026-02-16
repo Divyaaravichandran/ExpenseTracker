@@ -1,8 +1,11 @@
 import { Types } from "mongoose";
+import fs from "fs/promises";
+import path from "path";
 import { IExpense } from "../models/Expense";
 import { HttpError } from "../utils/HttpError";
 import { CreateManualExpenseInput } from "../validators/bills.validators";
-import { categoryExistsById, createExpense, findExpensesByUser } from "./expense.repository";
+import { categoryExistsById, createExpense, deleteExpenseByIdAndUser, findExpenseByIdAndUser, findExpensesByUser } from "./expense.repository";
+import { deleteReceiptByIdAndUser, findReceiptByIdAndUser } from "./receipt.repository";
 
 export const createManualExpense = async (userId: string, payload: CreateManualExpenseInput): Promise<IExpense> => {
   if (!Types.ObjectId.isValid(userId)) {
@@ -30,10 +33,49 @@ export const createManualExpense = async (userId: string, payload: CreateManualE
   });
 };
 
-export const getUserExpenses = async (userId: string): Promise<IExpense[]> => {
+export const getUserExpenses = async (userId: string): Promise<Record<string, unknown>[]> => {
   if (!Types.ObjectId.isValid(userId)) {
     throw new HttpError(401, "Invalid user id in token");
   }
 
   return findExpensesByUser(userId);
+};
+
+export const deleteUserExpenseWithReceipt = async (userId: string, expenseId: string): Promise<void> => {
+  if (!Types.ObjectId.isValid(userId)) {
+    throw new HttpError(401, "Invalid user id in token");
+  }
+
+  if (!Types.ObjectId.isValid(expenseId)) {
+    throw new HttpError(400, "Invalid expense id");
+  }
+
+  const expense = await findExpenseByIdAndUser(expenseId, userId);
+  if (!expense) {
+    throw new HttpError(404, "Expense not found");
+  }
+
+  const receiptId = expense.receipt_id ? String(expense.receipt_id) : null;
+  if (receiptId && Types.ObjectId.isValid(receiptId)) {
+    const receipt = await findReceiptByIdAndUser(receiptId, userId);
+    if (receipt) {
+      await deleteReceiptByIdAndUser(receiptId, userId);
+
+      if (receipt.imageUrl?.startsWith("/uploads/")) {
+        const relativeFile = receipt.imageUrl.replace(/^\/uploads\//, "");
+        const absoluteFilePath = path.join(process.cwd(), "uploads", relativeFile);
+
+        try {
+          await fs.unlink(absoluteFilePath);
+        } catch {
+          // Ignore cleanup errors to keep delete flow reliable.
+        }
+      }
+    }
+  }
+
+  const deleted = await deleteExpenseByIdAndUser(expenseId, userId);
+  if (!deleted) {
+    throw new HttpError(404, "Expense not found");
+  }
 };

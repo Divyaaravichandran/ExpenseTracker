@@ -1,9 +1,8 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HttpError } from "../utils/HttpError";
-import { saveUploadedFile } from "../services/storage.service";
-import { createUploadedReceipt, getUserReceipts } from "../services/receipt.service";
-import { createManualExpense, getUserExpenses } from "../services/expense.service";
+import { getUserReceipts, processUploadedBill } from "../services/receipt.service";
+import { createManualExpense, deleteUserExpenseWithReceipt, getUserExpenses } from "../services/expense.service";
 import { getCategories } from "../services/category.service";
 
 const getUserId = (req: Request): string => {
@@ -19,10 +18,9 @@ export const uploadBill = asyncHandler(async (req: Request, res: Response) => {
     throw new HttpError(400, "Bill image file is required");
   }
 
-  const imageUrl = await saveUploadedFile(req.file);
-  const receipt = await createUploadedReceipt(getUserId(req), imageUrl);
+  const result = await processUploadedBill(getUserId(req), req.file);
 
-  res.status(201).json(receipt);
+  res.status(201).json(result);
 });
 
 export const listBills = asyncHandler(async (req: Request, res: Response) => {
@@ -43,4 +41,10 @@ export const listExpenses = asyncHandler(async (req: Request, res: Response) => 
 export const listCategories = asyncHandler(async (_req: Request, res: Response) => {
   const categories = await getCategories();
   res.status(200).json(categories);
+});
+
+export const deleteExpense = asyncHandler(async (req: Request, res: Response) => {
+  const { expenseId } = req.params;
+  await deleteUserExpenseWithReceipt(getUserId(req), expenseId);
+  res.status(200).json({ message: "Expense deleted successfully" });
 });

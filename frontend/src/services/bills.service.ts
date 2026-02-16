@@ -1,8 +1,8 @@
 import api from "../api/axios";
 import { ENDPOINTS } from "../api/endpoints";
-import { Category, CreateManualExpensePayload, Expense, Receipt } from "../types/bill";
+import { Category, ConfirmBillPayload, ConfirmBillResult, CreateManualExpensePayload, Expense, Receipt, UploadBillResult } from "../types/bill";
 
-export const uploadBill = async (file: File): Promise<Receipt> => {
+export const uploadBill = async (file: File): Promise<UploadBillResult> => {
   const formData = new FormData();
   formData.append("bill", file);
 
@@ -12,7 +12,12 @@ export const uploadBill = async (file: File): Promise<Receipt> => {
     }
   });
 
-  return response.data as Receipt;
+  return response.data as UploadBillResult;
+};
+
+export const confirmBill = async (receiptId: string, payload: ConfirmBillPayload): Promise<ConfirmBillResult> => {
+  const response = await api.post(`${ENDPOINTS.bills.confirm}/${receiptId}`, payload);
+  return response.data as ConfirmBillResult;
 };
 
 export const getBills = async (): Promise<Receipt[]> => {
@@ -33,4 +38,9 @@ export const addManualExpense = async (payload: CreateManualExpensePayload): Pro
 export const getExpenses = async (): Promise<Expense[]> => {
   const response = await api.get(ENDPOINTS.bills.expenses);
   return response.data as Expense[];
+};
+
+export const deleteExpense = async (expenseId: string): Promise<{ message: string }> => {
+  const response = await api.delete(`${ENDPOINTS.expenses.base}/${expenseId}`);
+  return response.data as { message: string };
 };

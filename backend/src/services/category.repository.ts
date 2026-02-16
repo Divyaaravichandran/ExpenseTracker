@@ -20,3 +20,11 @@ export const upsertDefaultCategories = async (defaults: DefaultCategoryInput[]):
 export const findAllCategories = async (): Promise<ICategory[]> => {
   return Category.find({}).sort({ name: 1 });
 };
+
+export const findCategoryByName = async (name: string): Promise<ICategory | null> => {
+  return Category.findOne({ name: { $regex: `^${name}$`, $options: "i" } });
+};
+
+export const findCategoryById = async (categoryId: string): Promise<ICategory | null> => {
+  return Category.findById(categoryId);
+};

@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getBills, getExpenses } from "../../services/bills.service";
+import { deleteExpense, getBills, getExpenses } from "../../services/bills.service";
 import { Expense } from "../../types/bill";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [billsCount, setBillsCount] = useState(0);
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -20,9 +24,11 @@ export const Dashboard = () => {
         const [expenseList, billList] = await Promise.all([getExpenses(), getBills()]);
         setExpenses(expenseList);
         setBillsCount(billList.length);
+        setError(null);
       } catch {
         setExpenses([]);
         setBillsCount(0);
+        setError("Failed to load dashboard data");
       }
     };
 
@@ -41,7 +47,28 @@ export const Dashboard = () => {
       .reduce((sum, expense) => sum + expense.amount, 0);
   }, [expenses]);
 
-  const recentExpenses = expenses.slice(0, 8);
+  const transactions = showAllTransactions ? expenses : expenses.slice(0, 15);
+
+  const handleDelete = async (expenseId: string) => {
+    const shouldDelete = window.confirm("Delete this transaction?");
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingExpenseId(expenseId);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      await deleteExpense(expenseId);
+      setExpenses((prev) => prev.filter((expense) => expense._id !== expenseId));
+      setFeedback("Transaction deleted successfully.");
+    } catch (deleteError: any) {
+      setError(deleteError?.response?.data?.message || "Failed to delete transaction");
+    } finally {
+      setDeletingExpenseId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -91,34 +118,46 @@ export const Dashboard = () => {
               <h2 className="text-xl font-semibold text-slate-900">Recent Transactions</h2>
               <p className="text-slate-500 text-sm mt-1">Your latest expense entries</p>
             </div>
-            <button onClick={() => navigate("/expenses")} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-              View All
+            <button onClick={() => setShowAllTransactions((prev) => !prev)} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              {showAllTransactions ? "Show Less" : "View All"}
             </button>
           </div>
+          {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+          {feedback ? <p className="mb-4 text-sm text-emerald-600">{feedback}</p> : null}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="text-slate-500 border-b border-slate-200">
                   <th className="text-left py-4 px-4 font-semibold text-sm">Date</th>
                   <th className="text-left py-4 px-4 font-semibold text-sm">Merchant</th>
-                  <th className="text-left py-4 px-4 font-semibold text-sm">Category ID</th>
+                  <th className="text-left py-4 px-4 font-semibold text-sm">Category</th>
                   <th className="text-right py-4 px-4 font-semibold text-sm">Amount</th>
+                  <th className="text-right py-4 px-4 font-semibold text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {recentExpenses.map((transaction) => (
+                {transactions.map((transaction) => (
                   <tr key={transaction._id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors duration-150">
                     <td className="py-4 px-4 text-slate-700">{new Date(transaction.expense_date).toLocaleDateString()}</td>
                     <td className="py-4 px-4">
                       <span className="font-medium text-slate-900">{transaction.merchant}</span>
                     </td>
-                    <td className="py-4 px-4 text-slate-700">{transaction.category_id}</td>
+                    <td className="py-4 px-4 text-slate-700">{transaction.category?.name ?? "Unknown"}</td>
                     <td className="py-4 px-4 text-right font-semibold text-slate-900">${transaction.amount.toFixed(2)}</td>
+                    <td className="py-4 px-4 text-right">
+                      <button
+                        onClick={() => handleDelete(transaction._id)}
+                        disabled={deletingExpenseId === transaction._id}
+                        className="text-red-600 hover:text-red-700 disabled:opacity-60 font-medium text-sm"
+                      >
+                        {deletingExpenseId === transaction._id ? "Deleting..." : "Delete"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
-                {recentExpenses.length === 0 ? (
+                {transactions.length === 0 ? (
                   <tr>
-                    <td className="py-6 px-4 text-slate-500" colSpan={4}>
+                    <td className="py-6 px-4 text-slate-500" colSpan={5}>
                       No expenses yet.
                     </td>
                   </tr>

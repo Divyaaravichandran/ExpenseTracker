@@ -3,6 +3,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import authRoutes from "./routes/auth/auth.routes";
 import billsRoutes from "./routes/bills.routes";
+import expensesRoutes from "./routes/expenses.routes";
 import { errorHandler, notFound } from "./middleware/error.middleware";
 import { ensureDefaultCategories } from "./services/category.service";
 
@@ -35,6 +36,7 @@ if (!mongoUri) {
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/auth", authRoutes);
 app.use("/api/v1/bills", billsRoutes);
+app.use("/api/v1/expenses", expensesRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

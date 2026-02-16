@@ -1,26 +1,95 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getBills, uploadBill } from "../../services/bills.service";
-import { Receipt } from "../../types/bill";
+import { confirmBill, getBills, getCategories, uploadBill } from "../../services/bills.service";
+import { Category, ConfirmBillPayload, ConfirmBillResult, Receipt, UploadBillResult } from "../../types/bill";
+
+const toDateTimeLocalValue = (value: string | null | undefined): string => {
+  if (!value) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return `${value}T00:00`;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const matchCategoryId = (parsedCategoryName: string, categories: Category[]): string => {
+  if (!categories.length) {
+    return "";
+  }
+
+  const normalizedParsed = parsedCategoryName.trim().toLowerCase();
+  const exact = categories.find((category) => category.name.trim().toLowerCase() === normalizedParsed);
+  if (exact) {
+    return exact._id;
+  }
+
+  const fallbackOther = categories.find((category) => category.name.trim().toLowerCase() === "other");
+  if (fallbackOther) {
+    return fallbackOther._id;
+  }
+
+  return categories[0]._id;
+};
 
 const UploadBill = () => {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [bills, setBills] = useState<Receipt[]>([]);
   const [listLoading, setListLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<UploadBillResult | null>(null);
+  const [confirmResult, setConfirmResult] = useState<ConfirmBillResult | null>(null);
+  const [parsedForm, setParsedForm] = useState<ConfirmBillPayload>({
+    merchant: "",
+    amount: 0,
+    date: "",
+    category_id: ""
+  });
+  const [confidence, setConfidence] = useState<string>("0");
 
-  const loadBills = async () => {
+  const loadBills = async (): Promise<Receipt[]> => {
     setListLoading(true);
     try {
       const data = await getBills();
       setBills(data);
+      return data;
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to load bills");
+      return [];
     } finally {
       setListLoading(false);
+    }
+  };
+
+  const loadCategories = async (): Promise<Category[]> => {
+    setCategoriesLoading(true);
+    try {
+      const data = await getCategories();
+      setCategories(data);
+      return data;
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to load categories");
+      return [];
+    } finally {
+      setCategoriesLoading(false);
     }
   };
 
@@ -30,7 +99,8 @@ const UploadBill = () => {
       navigate("/login");
       return;
     }
-    loadBills();
+
+    void Promise.all([loadBills(), loadCategories()]);
   }, [navigate]);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -44,18 +114,90 @@ const UploadBill = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setConfirmResult(null);
 
     try {
-      await uploadBill(file);
-      setSuccess("Bill uploaded successfully");
+      const response = await uploadBill(file);
+      setUploadResult(response);
+      setConfidence(response.parsedResult.confidence || "0");
+
+      const latestCategories = categories.length > 0 ? categories : await loadCategories();
+      const categoryId = matchCategoryId(response.parsedResult.category || "Other", latestCategories);
+
+      setParsedForm({
+        merchant: response.parsedResult.merchant || "",
+        amount: response.parsedResult.amount ?? 0,
+        date: toDateTimeLocalValue(response.parsedResult.date),
+        category_id: categoryId
+      });
+
+      setSuccess("Bill parsed. Review and click Next to save.");
       setFile(null);
-      await loadBills();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to upload bill");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleParsedChange = (field: keyof ConfirmBillPayload, value: string) => {
+    setParsedForm((prev) => {
+      if (field === "amount") {
+        const amount = Number(value);
+        return { ...prev, amount: Number.isFinite(amount) ? amount : 0 };
+      }
+
+      return { ...prev, [field]: value };
+    });
+  };
+
+  const isParsedFormValid = useMemo(() => {
+    return Boolean(uploadResult?.receiptId) && parsedForm.merchant.trim().length > 0 && parsedForm.amount > 0 && parsedForm.date.trim().length > 0 && parsedForm.category_id.trim().length > 0;
+  }, [parsedForm, uploadResult?.receiptId]);
+
+  const handleNext = async () => {
+    if (!uploadResult?.receiptId) {
+      setError("No uploaded receipt found. Please upload a bill first.");
+      return;
+    }
+
+    if (!isParsedFormValid) {
+      setError("Please complete parsed result fields before saving.");
+      return;
+    }
+
+    setConfirming(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const payload: ConfirmBillPayload = {
+        merchant: parsedForm.merchant.trim(),
+        amount: parsedForm.amount,
+        date: new Date(parsedForm.date).toISOString(),
+        category_id: parsedForm.category_id
+      };
+
+      const response = await confirmBill(uploadResult.receiptId, payload);
+      const refreshedBills = await loadBills();
+      const confirmedReceipt = refreshedBills.find((bill) => bill._id === uploadResult.receiptId);
+      const parsedResult = response.parsedResult ?? confirmedReceipt?.parsedData ?? undefined;
+
+      if (!parsedResult) {
+        setError("Saving finished, but parsed result is missing in response.");
+        return;
+      }
+
+      setConfirmResult({ ...response, parsedResult });
+      setSuccess("Bill saved successfully.");
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to save bill");
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const apiBaseUrl = ((import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL || "http://localhost:4000");
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -91,6 +233,107 @@ const UploadBill = () => {
               </button>
             </div>
           </form>
+
+          {uploadResult ? (
+            <div className="mt-6 rounded-xl border border-slate-200 p-4 space-y-4">
+              <h3 className="text-lg font-semibold text-slate-900">Parsed Result</h3>
+
+              {uploadResult.imageUrl ? (
+                <img
+                  src={`${apiBaseUrl}${uploadResult.imageUrl}`}
+                  alt="Uploaded bill"
+                  className="max-h-64 rounded-lg border border-slate-200"
+                />
+              ) : null}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="merchant" className="text-sm font-medium text-slate-700">Merchant</label>
+                  <input
+                    id="merchant"
+                    type="text"
+                    value={parsedForm.merchant}
+                    onChange={(e) => handleParsedChange("merchant", e.target.value)}
+                    className="border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="amount" className="text-sm font-medium text-slate-700">Amount</label>
+                  <input
+                    id="amount"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={parsedForm.amount > 0 ? parsedForm.amount : ""}
+                    onChange={(e) => handleParsedChange("amount", e.target.value)}
+                    className="border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="expense-date" className="text-sm font-medium text-slate-700">Date</label>
+                  <input
+                    id="expense-date"
+                    type="datetime-local"
+                    value={parsedForm.date}
+                    onChange={(e) => handleParsedChange("date", e.target.value)}
+                    className="border border-slate-300 rounded-lg px-3 py-2"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="category" className="text-sm font-medium text-slate-700">Category</label>
+                  <select
+                    id="category"
+                    value={parsedForm.category_id}
+                    onChange={(e) => handleParsedChange("category_id", e.target.value)}
+                    className="border border-slate-300 rounded-lg px-3 py-2"
+                    disabled={categoriesLoading || categories.length === 0}
+                  >
+                    {categories.map((category) => (
+                      <option key={category._id} value={category._id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label htmlFor="confidence" className="text-sm font-medium text-slate-700">Confidence</label>
+                  <input
+                    id="confidence"
+                    type="text"
+                    value={confidence}
+                    readOnly
+                    className="border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 text-slate-600"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={!isParsedFormValid || confirming}
+                  className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {confirming ? "Saving..." : "Next"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {confirmResult ? (
+            <div className="mt-6 rounded-xl border border-slate-200 p-4 space-y-2">
+              <h3 className="text-lg font-semibold text-slate-900">Saved Result</h3>
+              <p className="text-slate-700">Merchant: {confirmResult.parsedResult?.merchant ?? "N/A"}</p>
+              <p className="text-slate-700">Amount: {confirmResult.parsedResult?.amount ?? "N/A"}</p>
+              <p className="text-slate-700">Date: {confirmResult.parsedResult?.date ?? "N/A"}</p>
+              <p className="text-slate-700">Category: {confirmResult.parsedResult?.category ?? "N/A"}</p>
+              <p className="text-slate-700">Confidence: {confirmResult.parsedResult?.confidence ?? "N/A"}</p>
+            </div>
+          ) : null}
         </section>
 
         <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -116,7 +359,7 @@ const UploadBill = () => {
                       <td className="py-3 text-slate-800">{bill.status}</td>
                       <td className="py-3">
                         {bill.imageUrl ? (
-                          <a href={`${((import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL || "http://localhost:4000")}${bill.imageUrl}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                          <a href={`${apiBaseUrl}${bill.imageUrl}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
                             View Image
                           </a>
                         ) : (
