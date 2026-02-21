@@ -49,6 +49,13 @@ export const Dashboard = () => {
 
   const transactions = showAllTransactions ? expenses : expenses.slice(0, 15);
 
+  const incomeTotal = useMemo(
+    () => expenses.reduce((sum, expense) => (expense.category?.name === "Income" ? sum + expense.amount : sum), 0),
+    [expenses]
+  );
+
+  const savedTotal = useMemo(() => Math.max(incomeTotal - totalExpenses, 0), [incomeTotal, totalExpenses]);
+
   const handleDelete = async (expenseId: string) => {
     const shouldDelete = window.confirm("Delete this transaction?");
     if (!shouldDelete) {
@@ -73,9 +80,19 @@ export const Dashboard = () => {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-10">
-        <section className="mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Welcome back</h1>
-          <p className="text-slate-500 mt-2 text-lg">Here&apos;s your expense overview.</p>
+        <section className="mb-8 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 shadow-sm"
+            aria-label="Go back"
+          >
+            <span className="text-lg">&larr;</span>
+          </button>
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Welcome back</h1>
+            <p className="text-slate-500 mt-1 text-lg">Here&apos;s your expense overview.</p>
+          </div>
         </section>
 
         <section className="bg-white border border-slate-200 rounded-2xl p-8 shadow-md mb-10">
@@ -98,17 +115,32 @@ export const Dashboard = () => {
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
-            <p className="text-4xl font-bold text-slate-900">${totalExpenses.toFixed(2)}</p>
-            <p className="text-slate-500 text-sm mt-2 font-medium">Total Expenses</p>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                Expenses
+              </span>
+            </div>
+            <p className="text-3xl md:text-4xl font-bold text-slate-900">${totalExpenses.toFixed(2)}</p>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
-            <p className="text-4xl font-bold text-slate-900">${thisMonthTotal.toFixed(2)}</p>
-            <p className="text-slate-500 text-sm mt-2 font-medium">This Month</p>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Income
+              </span>
+            </div>
+            <p className="text-3xl md:text-4xl font-bold text-slate-900">${incomeTotal.toFixed(2)}</p>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md">
-            <p className="text-4xl font-bold text-slate-900">{billsCount}</p>
-            <p className="text-slate-500 text-sm mt-2 font-medium">Total Bills</p>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-yellow-400" />
+                Saved
+              </span>
+            </div>
+            <p className="text-3xl md:text-4xl font-bold text-slate-900">${savedTotal.toFixed(2)}</p>
           </div>
         </section>
 

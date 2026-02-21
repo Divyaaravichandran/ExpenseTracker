@@ -20,6 +20,7 @@ const Expenses = () => {
     payment_mode: "",
     description: ""
   });
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const categoryNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -69,6 +70,9 @@ const Expenses = () => {
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === "payment_mode" && paymentError) {
+      setPaymentError(null);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -76,6 +80,12 @@ const Expenses = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+
+    if (!form.payment_mode) {
+      setPaymentError("Please select a payment option.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const payload: CreateManualExpensePayload = {
@@ -139,7 +149,25 @@ const Expenses = () => {
             </div>
 
             <input name="expense_date" value={form.expense_date} onChange={handleChange} type="datetime-local" className="border border-slate-300 rounded-lg px-3 py-2" required />
-            <input name="payment_mode" value={form.payment_mode} onChange={handleChange} placeholder="Payment Mode" className="border border-slate-300 rounded-lg px-3 py-2" required />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="payment_mode" className="text-sm font-medium text-slate-700">
+                Payment / Rice Stock
+              </label>
+              <select
+                id="payment_mode"
+                name="payment_mode"
+                value={form.payment_mode}
+                onChange={handleChange}
+                className="border border-slate-300 rounded-lg px-3 py-2"
+                required
+              >
+                <option value="">Select an option</option>
+                <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
+                <option value="UPI">UPI</option>
+              </select>
+              {paymentError && <p className="text-xs text-red-600">{paymentError}</p>}
+            </div>
             <textarea name="description" value={form.description} onChange={handleChange} placeholder="Description" className="border border-slate-300 rounded-lg px-3 py-2 md:col-span-2" required />
             <div className="md:col-span-2 flex gap-3">
               <button type="submit" disabled={loading || categories.length === 0} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-60">

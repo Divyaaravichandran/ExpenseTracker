@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { signup } from "../../services/auth.service";
 import { validateEmail, validatePassword } from "../../utils/authValidation";
 import "./auth.css";
 
 const Signup = () => {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,8 +52,17 @@ const Signup = () => {
 
     try {
       const data = await signup(name.trim(), email.trim().toLowerCase(), password);
+
+      // Persist auth information for future sessions
       localStorage.setItem("token", data.token);
+      if (data.user?.id) {
+        localStorage.setItem("userId", data.user.id);
+      }
+
       setSuccess("Account created. You are now signed in.");
+
+      // Redirect to dashboard after successful signup
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err?.response?.data?.message || "Signup failed. Please try again.");
     } finally {
