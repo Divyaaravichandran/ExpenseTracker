@@ -54,6 +54,12 @@ export interface Expense {
   expense_date: string;
   payment_mode: string;
   description: string;
+  tax: {
+    eligible: boolean;
+    section?: string;
+    maxLimit?: number;
+    financialYear?: string;
+  };
   created_at: string;
   category?: {
     name: string | null;

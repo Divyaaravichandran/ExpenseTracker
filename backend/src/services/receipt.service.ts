@@ -2,13 +2,13 @@ import { Types } from "mongoose";
 import { IReceipt } from "../models/Receipt";
 import { IExpense } from "../models/Expense";
 import { HttpError } from "../utils/HttpError";
-import { createExpense } from "./expense.repository";
 import { categoryExistsById } from "./expense.repository";
 import { findCategoryById, findCategoryByName } from "./category.repository";
 import { createReceipt, findReceiptByIdAndUser, findReceiptsByUser, updateReceiptById } from "./receipt.repository";
 import { OcrService } from "./ocr.service";
 import { parseBill } from "./huggingface/parseBill";
 import { ConfirmBillInput } from "../validators/bills.validators";
+import { createExpenseWithTax } from "./expense.service";
 
 interface UploadBillProcessingResult {
   receiptId: string;
@@ -121,16 +121,16 @@ export const confirmProcessedBill = async (userId: string, receiptId: string, pa
     confidence
   };
 
-  const expense = await createExpense({
-    user_id: userId,
-    category_id: String(finalCategory._id),
-    receipt_id: String(receipt._id),
+  const expense = await createExpenseWithTax({
+    userId,
+    categoryId: String(finalCategory._id),
+    receiptId: String(receipt._id),
     amount: payload.amount,
     merchant: payload.merchant.trim(),
-    expense_date: new Date(payload.date),
-    payment_mode: "Unknown",
+    expenseDate: new Date(payload.date),
+    paymentMode: "Unknown",
     description: "Auto generated from OCR",
-    created_at: new Date()
+    createdAt: new Date()
   });
 
   const updatedReceipt = await updateReceiptById(String(receipt._id), {

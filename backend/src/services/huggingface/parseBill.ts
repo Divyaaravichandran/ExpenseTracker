@@ -10,7 +10,74 @@ export interface ParsedBillResult {
   rawText: string;
 }
 
-const BILL_CATEGORIES = ["Food", "Shopping", "Utilities", "Travel", "Entertainment", "Other", "Fuel"];
+const BILL_CATEGORIES = [
+  "Food",
+  "Shopping",
+  "Utilities",
+  "Travel",
+  "Entertainment",
+  "Education",
+  "Medical",
+  "Fuel",
+  "Other"
+];
+
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  Education: [
+    "school",
+    "school fees",
+    "tuition",
+    "tuition fees",
+    "college",
+    "university",
+    "admission",
+    "semester fee",
+    "term fee",
+    "exam fee",
+    "books",
+    "academy",
+    "student"
+  ],
+  Medical: [
+    "hospital",
+    "clinic",
+    "doctor",
+    "pharmacy",
+    "medicine",
+    "medical",
+    "diagnostic",
+    "pathology",
+    "lab test",
+    "healthcare",
+    "prescription",
+    "patient"
+  ]
+};
+
+const getKeywordCategoryMatch = (rawText: string): { category: string; confidence: string } | null => {
+  const normalizedText = rawText.toLowerCase();
+  let bestCategory: string | null = null;
+  let bestScore = 0;
+
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    const score = keywords.reduce((accumulator, keyword) => {
+      return accumulator + (normalizedText.includes(keyword) ? 1 : 0);
+    }, 0);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestCategory = category;
+    }
+  }
+
+  if (!bestCategory || bestScore === 0) {
+    return null;
+  }
+
+  // Strong deterministic fallback for OCR-heavy bills when keywords are clearly present.
+  const confidence = Math.min(0.92, 0.7 + bestScore * 0.08);
+  return { category: bestCategory, confidence: confidence.toFixed(2) };
+};
 
 const getHfToken = (): string => {
   const token = process.env.HF_TOKEN?.trim();
@@ -116,9 +183,13 @@ export async function parseBill(rawText: string): Promise<ParsedBillResult> {
       }
     }
 
+    const keywordMatch = getKeywordCategoryMatch(rawText);
+    const finalCategory = keywordMatch?.category ?? category;
+    const finalConfidence = keywordMatch?.confidence ?? categoryConfidence;
+
     return {
-      category,
-      categoryConfidence,
+      category: finalCategory,
+      categoryConfidence: finalConfidence,
       merchant: getMerchant(entities as NEREntity[], rawText),
       date: extractDate(rawText),
       amount: extractAmount(rawText),
@@ -126,9 +197,17 @@ export async function parseBill(rawText: string): Promise<ParsedBillResult> {
     };
   } catch (error) {
     console.error("HuggingFace parseBill failed:", error);
-    if (error instanceof HttpError) {
-      throw error;
-    }
-    throw new HttpError(500, `HuggingFace parsing failed: ${(error as Error).message}`);
+    const keywordMatch = getKeywordCategoryMatch(rawText);
+    const fallbackCategory = keywordMatch?.category ?? "Other";
+    const fallbackConfidence = keywordMatch?.confidence ?? "0.35";
+
+    return {
+      category: fallbackCategory,
+      categoryConfidence: fallbackConfidence,
+      merchant: getMerchant(undefined, rawText),
+      date: extractDate(rawText),
+      amount: extractAmount(rawText),
+      rawText
+    };
   }
 }

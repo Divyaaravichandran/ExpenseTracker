@@ -2,6 +2,38 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { deleteExpense, getBills, getExpenses } from "../../services/bills.service";
 import { Expense } from "../../types/bill";
+import ExpenseTrendChart from "../../components/charts/ExpenseTrendChart";
+import CategoryPieChart from "../../components/charts/CategoryPieChart";
+import { formatCurrencyINR } from "../../utils/currency";
+import { formatDateDDMMYYYY, toInputDateValue } from "../../utils/formatDate";
+import {
+  detectOverspendingCategories,
+  detectRecurringMerchants,
+  detectUnusualHighExpense,
+  filterExpensesByDateRange,
+  getBudgetDecisionSupport,
+  getCategoryDelta,
+  getCategoryDistribution,
+  getMonthlyTrend,
+  getMonthComparison,
+  getTopMerchants,
+  getWeeklyDailyPatterns
+} from "../../utils/analytics";
+
+const downloadCsv = (filename: string, rows: string[][]): void => {
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, "\"\"")}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+};
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -11,6 +43,13 @@ export const Dashboard = () => {
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>(toInputDateValue(new Date()));
+
+  useEffect(() => {
+    const now = new Date();
+    setStartDate(toInputDateValue(new Date(now.getFullYear(), now.getMonth(), 1)));
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -32,29 +71,40 @@ export const Dashboard = () => {
       }
     };
 
-    loadData();
+    void loadData();
   }, [navigate]);
 
   const totalExpenses = useMemo(() => expenses.reduce((sum, expense) => sum + expense.amount, 0), [expenses]);
-
-  const thisMonthTotal = useMemo(() => {
-    const now = new Date();
-    return expenses
-      .filter((expense) => {
-        const date = new Date(expense.expense_date);
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, expense) => sum + expense.amount, 0);
-  }, [expenses]);
-
   const transactions = showAllTransactions ? expenses : expenses.slice(0, 15);
 
-  const incomeTotal = useMemo(
-    () => expenses.reduce((sum, expense) => (expense.category?.name === "Income" ? sum + expense.amount : sum), 0),
-    [expenses]
+  const thisMonthExpenses = useMemo(() => {
+    const now = new Date();
+    return expenses.filter((expense) => {
+      const date = new Date(expense.expense_date);
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    });
+  }, [expenses]);
+  const thisMonthTotal = useMemo(
+    () => thisMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+    [thisMonthExpenses]
   );
 
-  const savedTotal = useMemo(() => Math.max(incomeTotal - totalExpenses, 0), [incomeTotal, totalExpenses]);
+  const monthComparison = useMemo(() => getMonthComparison(expenses), [expenses]);
+  const foodDelta = useMemo(() => getCategoryDelta(expenses, "Food"), [expenses]);
+  const monthlyTrend = useMemo(() => getMonthlyTrend(expenses), [expenses]);
+  const categoryDistribution = useMemo(() => getCategoryDistribution(thisMonthExpenses), [thisMonthExpenses]);
+  const weeklyDailyPattern = useMemo(() => getWeeklyDailyPatterns(expenses), [expenses]);
+  const recurringMerchants = useMemo(() => detectRecurringMerchants(thisMonthExpenses), [thisMonthExpenses]);
+  const unusualExpense = useMemo(() => detectUnusualHighExpense(thisMonthExpenses), [thisMonthExpenses]);
+  const overspendingCategories = useMemo(() => detectOverspendingCategories(categoryDistribution), [categoryDistribution]);
+  const budgetSupport = useMemo(() => getBudgetDecisionSupport(expenses), [expenses]);
+  const filteredExpenses = useMemo(
+    () => filterExpensesByDateRange(expenses, startDate || undefined, endDate || undefined),
+    [endDate, expenses, startDate]
+  );
+
+  const highestCategory = categoryDistribution[0];
+  const lowestCategory = categoryDistribution[categoryDistribution.length - 1];
 
   const handleDelete = async (expenseId: string) => {
     const shouldDelete = window.confirm("Delete this transaction?");
@@ -77,80 +127,253 @@ export const Dashboard = () => {
     }
   };
 
+  const handleExportMonthlySummaryCsv = () => {
+    const topMerchants = getTopMerchants(thisMonthExpenses, 5);
+    const rows: string[][] = [
+      ["Monthly Summary Report"],
+      ["Month", new Date().toLocaleString("en-IN", { month: "long", year: "numeric" })],
+      ["Total Expenses", thisMonthTotal.toFixed(2)],
+      ["Bills Uploaded", String(billsCount)],
+      ["Current Month", monthComparison.currentMonthTotal.toFixed(2)],
+      ["Previous Month", monthComparison.previousMonthTotal.toFixed(2)],
+      ["MoM Percent Change", `${monthComparison.percentChange.toFixed(2)}%`],
+      [],
+      ["Category Breakdown"],
+      ["Category", "Total", "Share %"],
+      ...categoryDistribution.map((item) => [item.category, item.total.toFixed(2), item.sharePercent.toFixed(2)]),
+      [],
+      ["Top 5 Merchants"],
+      ["Merchant", "Visits", "Total Amount"],
+      ...topMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)]),
+      [],
+      ["Recurring Expenses"],
+      ["Merchant", "Visits", "Total Amount"],
+      ...recurringMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)])
+    ];
+
+    downloadCsv(`monthly-summary-${toInputDateValue(new Date())}.csv`, rows);
+  };
+
+  const handleExportDateRangeCsv = () => {
+    const distribution = getCategoryDistribution(filteredExpenses);
+    const topMerchants = getTopMerchants(filteredExpenses, 5);
+
+    const rows: string[][] = [
+      ["Date Range Report"],
+      ["Start Date", startDate ? formatDateDDMMYYYY(startDate) : "N/A"],
+      ["End Date", endDate ? formatDateDDMMYYYY(endDate) : "N/A"],
+      ["Total Expenses", filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0).toFixed(2)],
+      [],
+      ["Category Breakdown"],
+      ["Category", "Total", "Share %"],
+      ...distribution.map((item) => [item.category, item.total.toFixed(2), item.sharePercent.toFixed(2)]),
+      [],
+      ["Top Merchants"],
+      ["Merchant", "Visits", "Total Amount"],
+      ...topMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)])
+    ];
+
+    downloadCsv(`date-range-report-${startDate || "start"}-to-${endDate || "end"}.csv`, rows);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="mx-auto max-w-7xl px-6 py-10">
         <section className="mb-8 flex items-center gap-4">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 shadow-sm"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-900"
             aria-label="Go back"
           >
             <span className="text-lg">&larr;</span>
           </button>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Welcome back</h1>
-            <p className="text-slate-500 mt-1 text-lg">Here&apos;s your expense overview.</p>
+            <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">Welcome back</h1>
+            <p className="mt-1 text-lg text-slate-500">Here&apos;s your expense overview.</p>
           </div>
         </section>
 
-        <section className="bg-white border border-slate-200 rounded-2xl p-8 shadow-md mb-10">
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Quick Actions</h2>
-          <p className="text-slate-500 text-sm mb-6">Common tasks to manage your expenses</p>
+        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-8 shadow-md">
+          <h2 className="mb-2 text-xl font-semibold text-slate-900">Quick Actions</h2>
+          <p className="mb-6 text-sm text-slate-500">Common tasks to manage your expenses</p>
           <div className="flex flex-wrap gap-4">
             <button
               onClick={() => navigate("/upload")}
-              className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
+              className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 px-6 py-3 font-medium text-white shadow-md transition-all duration-300 hover:from-blue-600 hover:to-indigo-600 hover:shadow-lg"
             >
               Upload Bill
             </button>
             <button
               onClick={() => navigate("/expenses")}
-              className="bg-white border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-xl hover:border-blue-500 hover:text-blue-600 transition-all duration-300 font-medium"
+              className="rounded-xl border-2 border-slate-300 bg-white px-6 py-3 font-medium text-slate-700 transition-all duration-300 hover:border-blue-500 hover:text-blue-600"
             >
               Add Expense
+            </button>
+            <button
+              onClick={() => navigate("/tax-summary")}
+              className="rounded-xl bg-slate-900 px-6 py-3 font-medium text-white shadow-md transition-all duration-300 hover:bg-black hover:shadow-lg"
+            >
+              Tax Summary
             </button>
           </div>
         </section>
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
-                Expenses
-              </span>
-            </div>
-            <p className="text-3xl md:text-4xl font-bold text-slate-900">${totalExpenses.toFixed(2)}</p>
+        <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="h-2 w-2 rounded-full bg-blue-500" />
+              Expenses
+            </span>
+            <p className="text-3xl font-bold text-slate-900 md:text-4xl">{formatCurrencyINR(totalExpenses)}</p>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Income
-              </span>
-            </div>
-            <p className="text-3xl md:text-4xl font-bold text-slate-900">${incomeTotal.toFixed(2)}</p>
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              This Month
+            </span>
+            <p className="text-3xl font-bold text-slate-900 md:text-4xl">{formatCurrencyINR(monthComparison.currentMonthTotal)}</p>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                <span className="h-2 w-2 rounded-full bg-yellow-400" />
-                Saved
-              </span>
-            </div>
-            <p className="text-3xl md:text-4xl font-bold text-slate-900">${savedTotal.toFixed(2)}</p>
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="h-2 w-2 rounded-full bg-yellow-400" />
+              Bills Uploaded
+            </span>
+            <p className="text-3xl font-bold text-slate-900 md:text-4xl">{billsCount}</p>
           </div>
         </section>
 
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md mb-10">
-          <div className="flex justify-between items-center mb-6">
+        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <h2 className="text-xl font-semibold text-slate-900">Spending Insights & Trend Analysis</h2>
+          <div className="mt-4 space-y-2 text-sm text-slate-700">
+            <p>
+              Spending {monthComparison.delta >= 0 ? "increased" : "decreased"} by{" "}
+              <span className="font-semibold">{Math.abs(monthComparison.percentChange).toFixed(2)}%</span> compared to last month.
+            </p>
+            <p>
+              Food category {foodDelta >= 0 ? "increased" : "decreased"} by{" "}
+              <span className="font-semibold">{formatCurrencyINR(Math.abs(foodDelta))}</span> compared to previous month.
+            </p>
+            <p>
+              You spend most on <span className="font-semibold">{weeklyDailyPattern.highestSpendingDay}</span>. Average daily expense:{" "}
+              <span className="font-semibold">{formatCurrencyINR(weeklyDailyPattern.averageDailySpending)}</span>. This week:{" "}
+              <span className="font-semibold">{formatCurrencyINR(weeklyDailyPattern.totalThisWeek)}</span>.
+            </p>
+          </div>
+        </section>
+
+        <section className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <ExpenseTrendChart data={monthlyTrend} />
+          <CategoryPieChart data={categoryDistribution} />
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <h2 className="text-xl font-semibold text-slate-900">Smart Financial Insights Engine</h2>
+          <ul className="mt-4 space-y-2 text-sm text-slate-700">
+            {recurringMerchants.slice(0, 3).map((merchant) => (
+              <li key={merchant.merchant}>
+                You visited <span className="font-semibold">{merchant.merchant}</span> {merchant.count} times this month.
+              </li>
+            ))}
+            {unusualExpense ? (
+              <li>
+                Unusual high expense detected: <span className="font-semibold">{unusualExpense.merchant}</span> at{" "}
+                <span className="font-semibold">{formatCurrencyINR(unusualExpense.amount)}</span>.
+              </li>
+            ) : (
+              <li>No unusual high expense detected this month.</li>
+            )}
+            {overspendingCategories.map((category) => (
+              <li key={category.category}>
+                {category.category} accounts for <span className="font-semibold">{category.sharePercent.toFixed(1)}%</span> of total monthly spend.
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              Highest spending category: <span className="font-semibold">{highestCategory?.category || "N/A"}</span>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              Lowest spending category: <span className="font-semibold">{lowestCategory?.category || "N/A"}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <h2 className="text-xl font-semibold text-slate-900">Reports & Summaries</h2>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="flex flex-col">
+              <label htmlFor="start-date" className="text-xs text-slate-600">Start Date</label>
+              <input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="end-date" className="text-xs text-slate-600">End Date</label>
+              <input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleExportMonthlySummaryCsv}
+              className="rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+            >
+              Download Monthly CSV
+            </button>
+            <button
+              type="button"
+              onClick={handleExportDateRangeCsv}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Download Date Range CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Download PDF
+            </button>
+          </div>
+          <p className="mt-3 text-sm text-slate-600">
+            Selected range total: <span className="font-semibold">{formatCurrencyINR(filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0))}</span>
+          </p>
+        </section>
+
+        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <h2 className="text-xl font-semibold text-slate-900">Financial Decision Support</h2>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Suggested budget limit: <span className="font-semibold">{formatCurrencyINR(budgetSupport.suggestedBudgetLimit)}</span>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              {budgetSupport.overspendingAmount > 0
+                ? `Overspending warning: You exceeded by ${formatCurrencyINR(budgetSupport.overspendingAmount)}`
+                : "No overspending warning for this month."}
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              If you reduce food spending by 10%, you save approximately{" "}
+              <span className="font-semibold">{formatCurrencyINR(budgetSupport.savingsSuggestion)}</span> per month.
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <div className="mb-6 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Recent Transactions</h2>
-              <p className="text-slate-500 text-sm mt-1">Your latest expense entries</p>
+              <p className="mt-1 text-sm text-slate-500">Your latest expense entries</p>
             </div>
-            <button onClick={() => setShowAllTransactions((prev) => !prev)} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            <button onClick={() => setShowAllTransactions((prev) => !prev)} className="text-sm font-medium text-blue-600 hover:text-blue-700">
               {showAllTransactions ? "Show Less" : "View All"}
             </button>
           </div>
@@ -159,28 +382,28 @@ export const Dashboard = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="text-slate-500 border-b border-slate-200">
-                  <th className="text-left py-4 px-4 font-semibold text-sm">Date</th>
-                  <th className="text-left py-4 px-4 font-semibold text-sm">Merchant</th>
-                  <th className="text-left py-4 px-4 font-semibold text-sm">Category</th>
-                  <th className="text-right py-4 px-4 font-semibold text-sm">Amount</th>
-                  <th className="text-right py-4 px-4 font-semibold text-sm">Actions</th>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="px-4 py-4 text-left text-sm font-semibold">Date</th>
+                  <th className="px-4 py-4 text-left text-sm font-semibold">Merchant</th>
+                  <th className="px-4 py-4 text-left text-sm font-semibold">Category</th>
+                  <th className="px-4 py-4 text-right text-sm font-semibold">Amount</th>
+                  <th className="px-4 py-4 text-right text-sm font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.map((transaction) => (
-                  <tr key={transaction._id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors duration-150">
-                    <td className="py-4 px-4 text-slate-700">{new Date(transaction.expense_date).toLocaleDateString()}</td>
-                    <td className="py-4 px-4">
+                  <tr key={transaction._id} className="border-b border-slate-100 transition-colors duration-150 hover:bg-slate-50">
+                    <td className="px-4 py-4 text-slate-700">{formatDateDDMMYYYY(transaction.expense_date)}</td>
+                    <td className="px-4 py-4">
                       <span className="font-medium text-slate-900">{transaction.merchant}</span>
                     </td>
-                    <td className="py-4 px-4 text-slate-700">{transaction.category?.name ?? "Unknown"}</td>
-                    <td className="py-4 px-4 text-right font-semibold text-slate-900">${transaction.amount.toFixed(2)}</td>
-                    <td className="py-4 px-4 text-right">
+                    <td className="px-4 py-4 text-slate-700">{transaction.category?.name ?? "Unknown"}</td>
+                    <td className="px-4 py-4 text-right font-semibold text-slate-900">{formatCurrencyINR(transaction.amount)}</td>
+                    <td className="px-4 py-4 text-right">
                       <button
                         onClick={() => handleDelete(transaction._id)}
                         disabled={deletingExpenseId === transaction._id}
-                        className="text-red-600 hover:text-red-700 disabled:opacity-60 font-medium text-sm"
+                        className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-60"
                       >
                         {deletingExpenseId === transaction._id ? "Deleting..." : "Delete"}
                       </button>
@@ -189,7 +412,7 @@ export const Dashboard = () => {
                 ))}
                 {transactions.length === 0 ? (
                   <tr>
-                    <td className="py-6 px-4 text-slate-500" colSpan={5}>
+                    <td className="px-4 py-6 text-slate-500" colSpan={5}>
                       No expenses yet.
                     </td>
                   </tr>

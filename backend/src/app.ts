@@ -6,6 +6,8 @@ import billsRoutes from "./routes/bills.routes";
 import expensesRoutes from "./routes/expenses.routes";
 import { errorHandler, notFound } from "./middleware/error.middleware";
 import { ensureDefaultCategories } from "./services/category.service";
+import { reportsRouter, taxRulesRouter } from "./modules/tax/tax.route";
+import { ensureDefaultTaxRules } from "./modules/tax/tax.service";
 
 const app = express();
 
@@ -25,11 +27,13 @@ if (!mongoUri) {
 } else {
   mongoose
     .connect(mongoUri)
-    .then(async () => {
-      console.log("MongoDB connected");
-      await ensureDefaultCategories();
-      console.log("Default categories ensured");
-    })
+      .then(async () => {
+        console.log("MongoDB connected");
+        await ensureDefaultCategories();
+        console.log("Default categories ensured");
+        await ensureDefaultTaxRules();
+        console.log("Default tax rules ensured");
+      })
     .catch((err) => console.error("MongoDB connection error", err));
 }
 
@@ -37,6 +41,10 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/auth", authRoutes);
 app.use("/api/v1/bills", billsRoutes);
 app.use("/api/v1/expenses", expensesRoutes);
+app.use("/api/v1/reports", reportsRouter);
+app.use("/api/v1/tax-rules", taxRulesRouter);
+app.use("/v1/reports", reportsRouter);
+app.use("/v1/tax-rules", taxRulesRouter);
 app.use(notFound);
 app.use(errorHandler);
 

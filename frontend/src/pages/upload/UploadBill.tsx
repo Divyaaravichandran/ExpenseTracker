@@ -2,28 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { confirmBill, getBills, getCategories, uploadBill } from "../../services/bills.service";
 import { Category, ConfirmBillPayload, ConfirmBillResult, Receipt, UploadBillResult } from "../../types/bill";
-
-const toDateTimeLocalValue = (value: string | null | undefined): string => {
-  if (!value) {
-    return "";
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return `${value}T00:00`;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
+import { formatDateDDMMYYYY, toInputDateValue } from "../../utils/formatDate";
 
 const matchCategoryId = (parsedCategoryName: string, categories: Category[]): string => {
   if (!categories.length) {
@@ -127,7 +106,7 @@ const UploadBill = () => {
       setParsedForm({
         merchant: response.parsedResult.merchant || "",
         amount: response.parsedResult.amount ?? 0,
-        date: toDateTimeLocalValue(response.parsedResult.date),
+        date: toInputDateValue(response.parsedResult.date || ""),
         category_id: categoryId
       });
 
@@ -174,7 +153,7 @@ const UploadBill = () => {
       const payload: ConfirmBillPayload = {
         merchant: parsedForm.merchant.trim(),
         amount: parsedForm.amount,
-        date: new Date(parsedForm.date).toISOString(),
+        date: new Date(`${parsedForm.date}T00:00:00`).toISOString(),
         category_id: parsedForm.category_id
       };
 
@@ -275,11 +254,14 @@ const UploadBill = () => {
                   <label htmlFor="expense-date" className="text-sm font-medium text-slate-700">Date</label>
                   <input
                     id="expense-date"
-                    type="datetime-local"
+                    type="date"
                     value={parsedForm.date}
                     onChange={(e) => handleParsedChange("date", e.target.value)}
                     className="border border-slate-300 rounded-lg px-3 py-2"
                   />
+                  <p className="text-xs text-slate-500">
+                    Parsed: {parsedForm.date ? formatDateDDMMYYYY(parsedForm.date) : "N/A"}
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -329,7 +311,7 @@ const UploadBill = () => {
               <h3 className="text-lg font-semibold text-slate-900">Saved Result</h3>
               <p className="text-slate-700">Merchant: {confirmResult.parsedResult?.merchant ?? "N/A"}</p>
               <p className="text-slate-700">Amount: {confirmResult.parsedResult?.amount ?? "N/A"}</p>
-              <p className="text-slate-700">Date: {confirmResult.parsedResult?.date ?? "N/A"}</p>
+              <p className="text-slate-700">Date: {confirmResult.parsedResult?.date ? formatDateDDMMYYYY(confirmResult.parsedResult.date) : "N/A"}</p>
               <p className="text-slate-700">Category: {confirmResult.parsedResult?.category ?? "N/A"}</p>
               <p className="text-slate-700">Confidence: {confirmResult.parsedResult?.confidence ?? "N/A"}</p>
             </div>
@@ -355,7 +337,7 @@ const UploadBill = () => {
                 <tbody>
                   {bills.map((bill) => (
                     <tr key={bill._id} className="border-b border-slate-100">
-                      <td className="py-3 text-slate-800">{new Date(bill.uploadedAt).toLocaleString()}</td>
+                      <td className="py-3 text-slate-800">{formatDateDDMMYYYY(bill.uploadedAt)}</td>
                       <td className="py-3 text-slate-800">{bill.status}</td>
                       <td className="py-3">
                         {bill.imageUrl ? (

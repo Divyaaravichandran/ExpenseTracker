@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { addManualExpense, getCategories, getExpenses } from "../../services/bills.service";
 import { Category, CreateManualExpensePayload, Expense } from "../../types/bill";
+import { formatDateDDMMYYYY } from "../../utils/formatDate";
 
 const Expenses = () => {
   const navigate = useNavigate();
@@ -47,9 +48,6 @@ const Expenses = () => {
     try {
       const data = await getCategories();
       setCategories(data);
-      if (data.length > 0) {
-        setForm((prev) => ({ ...prev, category_id: prev.category_id || data[0]._id }));
-      }
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to load categories");
     } finally {
@@ -92,21 +90,21 @@ const Expenses = () => {
         merchant: form.merchant.trim(),
         amount: Number(form.amount),
         category_id: form.category_id,
-        expense_date: new Date(form.expense_date).toISOString(),
+        expense_date: new Date(`${form.expense_date}T00:00:00`).toISOString(),
         payment_mode: form.payment_mode.trim(),
         description: form.description.trim()
       };
 
       await addManualExpense(payload);
       setSuccess("Expense added successfully");
-      setForm((prev) => ({
+      setForm({
         merchant: "",
         amount: "",
-        category_id: prev.category_id,
+        category_id: "",
         expense_date: "",
         payment_mode: "",
         description: ""
-      }));
+      });
       await loadExpenses();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to add expense");
@@ -126,8 +124,11 @@ const Expenses = () => {
           {success && <p className="mt-4 text-sm text-emerald-600">{success}</p>}
 
           <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input name="merchant" value={form.merchant} onChange={handleChange} placeholder="Merchant" className="border border-slate-300 rounded-lg px-3 py-2" required />
-            <input name="amount" value={form.amount} onChange={handleChange} type="number" min="0.01" step="0.01" placeholder="Amount" className="border border-slate-300 rounded-lg px-3 py-2" required />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="merchant" className="text-sm font-medium text-slate-700">Merchant Name</label>
+              <input id="merchant" name="merchant" value={form.merchant} onChange={handleChange} placeholder="Merchant Name" className="border border-slate-300 rounded-lg px-3 py-2" required />
+            </div>
+            <input name="amount" value={form.amount} onChange={handleChange} type="number" min="0.01" step="0.01" placeholder="Amount" className="border border-slate-300 rounded-lg px-3 py-2 h-[42px] self-end" required />
 
             <div className="flex flex-col gap-1">
               <label htmlFor="category_id" className="text-sm font-medium text-slate-700">Category</label>
@@ -140,6 +141,7 @@ const Expenses = () => {
                 disabled={categoriesLoading || categories.length === 0}
                 required
               >
+                <option value="">Select the category</option>
                 {categories.map((category) => (
                   <option key={category._id} value={category._id}>
                     {category.name}
@@ -148,10 +150,10 @@ const Expenses = () => {
               </select>
             </div>
 
-            <input name="expense_date" value={form.expense_date} onChange={handleChange} type="datetime-local" className="border border-slate-300 rounded-lg px-3 py-2" required />
+            <input name="expense_date" value={form.expense_date} onChange={handleChange} type="date" className="border border-slate-300 rounded-lg px-3 py-2 h-[42px] self-end" required />
             <div className="flex flex-col gap-1">
               <label htmlFor="payment_mode" className="text-sm font-medium text-slate-700">
-                Payment / Rice Stock
+                Payment Mode
               </label>
               <select
                 id="payment_mode"
@@ -163,8 +165,12 @@ const Expenses = () => {
               >
                 <option value="">Select an option</option>
                 <option value="Cash">Cash</option>
-                <option value="Card">Card</option>
                 <option value="UPI">UPI</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Debit Card">Debit Card</option>
+                <option value="Net Banking">Net Banking</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Others">Others</option>
               </select>
               {paymentError && <p className="text-xs text-red-600">{paymentError}</p>}
             </div>
@@ -191,7 +197,7 @@ const Expenses = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="text-left py-3">Created</th>
+                    <th className="text-left py-3">Date</th>
                     <th className="text-left py-3">Merchant</th>
                     <th className="text-left py-3">Category</th>
                     <th className="text-left py-3">Amount</th>
@@ -202,7 +208,7 @@ const Expenses = () => {
                 <tbody>
                   {expenses.map((expense) => (
                     <tr key={expense._id} className="border-b border-slate-100">
-                      <td className="py-3">{new Date(expense.created_at).toLocaleString()}</td>
+                      <td className="py-3">{formatDateDDMMYYYY(expense.expense_date)}</td>
                       <td className="py-3">{expense.merchant}</td>
                       <td className="py-3">{categoryNameMap[expense.category_id] || "Unknown"}</td>
                       <td className="py-3">{expense.amount.toFixed(2)}</td>

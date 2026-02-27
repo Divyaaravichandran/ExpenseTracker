@@ -6,6 +6,36 @@ import { HttpError } from "../utils/HttpError";
 import { CreateManualExpenseInput } from "../validators/bills.validators";
 import { categoryExistsById, createExpense, deleteExpenseByIdAndUser, findExpenseByIdAndUser, findExpensesByUser } from "./expense.repository";
 import { deleteReceiptByIdAndUser, findReceiptByIdAndUser } from "./receipt.repository";
+import { resolveTaxMetaForExpense } from "../modules/tax/tax.service";
+
+interface CreateExpenseInput {
+  userId: string;
+  categoryId: string;
+  receiptId?: string | null;
+  amount: number;
+  merchant: string;
+  expenseDate: Date;
+  paymentMode: string;
+  description: string;
+  createdAt?: Date;
+}
+
+export const createExpenseWithTax = async (input: CreateExpenseInput): Promise<IExpense> => {
+  const tax = await resolveTaxMetaForExpense(input.categoryId, input.expenseDate);
+
+  return createExpense({
+    user_id: input.userId,
+    category_id: input.categoryId,
+    receipt_id: input.receiptId ?? null,
+    amount: input.amount,
+    merchant: input.merchant,
+    expense_date: input.expenseDate,
+    payment_mode: input.paymentMode,
+    description: input.description,
+    tax,
+    created_at: input.createdAt
+  });
+};
 
 export const createManualExpense = async (userId: string, payload: CreateManualExpenseInput): Promise<IExpense> => {
   if (!Types.ObjectId.isValid(userId)) {
@@ -21,14 +51,14 @@ export const createManualExpense = async (userId: string, payload: CreateManualE
     throw new HttpError(404, "Category not found for provided category_id");
   }
 
-  return createExpense({
-    user_id: userId,
-    category_id: payload.category_id,
-    receipt_id: null,
+  return createExpenseWithTax({
+    userId,
+    categoryId: payload.category_id,
+    receiptId: null,
     amount: payload.amount,
     merchant: payload.merchant,
-    expense_date: new Date(payload.expense_date),
-    payment_mode: payload.payment_mode,
+    expenseDate: new Date(payload.expense_date),
+    paymentMode: payload.payment_mode,
     description: payload.description
   });
 };

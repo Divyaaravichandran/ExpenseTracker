@@ -11,6 +11,12 @@ interface CreateExpenseParams {
   expense_date: Date;
   payment_mode: string;
   description: string;
+  tax: {
+    eligible: boolean;
+    section?: string;
+    maxLimit?: number;
+    financialYear?: string;
+  };
   created_at?: Date;
 }
 
@@ -24,6 +30,7 @@ export const createExpense = async (params: CreateExpenseParams): Promise<IExpen
     expense_date: params.expense_date,
     payment_mode: params.payment_mode,
     description: params.description,
+    tax: params.tax,
     created_at: params.created_at
   });
 };

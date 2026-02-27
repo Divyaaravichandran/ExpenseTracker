@@ -7,6 +7,8 @@ const DEFAULT_CATEGORIES = [
   { name: "Utilities", keywords: "electricity,water,internet,utility" },
   { name: "Travel", keywords: "travel,flight,hotel,taxi" },
   { name: "Entertainment", keywords: "movies,games,streaming,entertainment" },
+  { name: "Education", keywords: "education,school,tuition,fees,college,university,academy,course,books" },
+  { name: "Medical", keywords: "medical,hospital,clinic,doctor,pharmacy,medicine,diagnostic,lab,health" },
   { name: "Other", keywords: "other,misc" },
   { name: "Fuel", keywords: "fuel,petrol,gas" }
 ] as const;
