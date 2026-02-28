@@ -6,12 +6,12 @@ interface CategoryPieChartProps {
   data: CategoryShare[];
 }
 
-const palette = ["#111827", "#374151", "#6b7280", "#9ca3af", "#d1d5db", "#1f2937", "#4b5563"];
+const palette = ["#2563eb", "#14b8a6", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#22c55e"];
 
 const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ data }) => {
   if (data.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-cyan-100">
         <h3 className="text-lg font-semibold text-slate-900">Category Distribution</h3>
         <p className="mt-4 text-sm text-slate-500">No data available.</p>
       </div>
@@ -29,7 +29,7 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ data }) => {
     .join(", ");
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-cyan-100">
       <h3 className="text-lg font-semibold text-slate-900">Category Distribution</h3>
       <div className="mt-5 flex flex-col items-center gap-5 lg:flex-row lg:items-start">
         <div className="h-44 w-44 rounded-full border border-slate-200" style={{ background: `conic-gradient(${gradient})` }} />

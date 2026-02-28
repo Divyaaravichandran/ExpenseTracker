@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deleteExpense, getBills, getExpenses } from "../../services/bills.service";
-import { Expense } from "../../types/bill";
+import { getBills, getExpenses } from "../../services/bills.service";
 import ExpenseTrendChart from "../../components/charts/ExpenseTrendChart";
 import CategoryPieChart from "../../components/charts/CategoryPieChart";
+import { Expense } from "../../types/bill";
 import { formatCurrencyINR } from "../../utils/currency";
 import { formatDateDDMMYYYY, toInputDateValue } from "../../utils/formatDate";
 import {
@@ -39,9 +39,6 @@ export const Dashboard = () => {
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [billsCount, setBillsCount] = useState(0);
-  const [showAllTransactions, setShowAllTransactions] = useState(false);
-  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>(toInputDateValue(new Date()));
@@ -75,8 +72,6 @@ export const Dashboard = () => {
   }, [navigate]);
 
   const totalExpenses = useMemo(() => expenses.reduce((sum, expense) => sum + expense.amount, 0), [expenses]);
-  const transactions = showAllTransactions ? expenses : expenses.slice(0, 15);
-
   const thisMonthExpenses = useMemo(() => {
     const now = new Date();
     return expenses.filter((expense) => {
@@ -105,27 +100,6 @@ export const Dashboard = () => {
 
   const highestCategory = categoryDistribution[0];
   const lowestCategory = categoryDistribution[categoryDistribution.length - 1];
-
-  const handleDelete = async (expenseId: string) => {
-    const shouldDelete = window.confirm("Delete this transaction?");
-    if (!shouldDelete) {
-      return;
-    }
-
-    setDeletingExpenseId(expenseId);
-    setError(null);
-    setFeedback(null);
-
-    try {
-      await deleteExpense(expenseId);
-      setExpenses((prev) => prev.filter((expense) => expense._id !== expenseId));
-      setFeedback("Transaction deleted successfully.");
-    } catch (deleteError: any) {
-      setError(deleteError?.response?.data?.message || "Failed to delete transaction");
-    } finally {
-      setDeletingExpenseId(null);
-    }
-  };
 
   const handleExportMonthlySummaryCsv = () => {
     const topMerchants = getTopMerchants(thisMonthExpenses, 5);
@@ -176,25 +150,43 @@ export const Dashboard = () => {
     downloadCsv(`date-range-report-${startDate || "start"}-to-${endDate || "end"}.csv`, rows);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    navigate("/login", { replace: true });
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-violet-50">
       <div className="mx-auto max-w-7xl px-6 py-10">
-        <section className="mb-8 flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-900"
-            aria-label="Go back"
-          >
-            <span className="text-lg">&larr;</span>
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">Welcome back</h1>
-            <p className="mt-1 text-lg text-slate-500">Here&apos;s your expense overview.</p>
+        <section className="mb-8 rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl shadow-indigo-100 backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Go back"
+              >
+                <span className="text-lg">&larr;</span>
+              </button>
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Expense Management</p>
+                <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">Welcome back</h1>
+                <p className="mt-1 text-sm text-slate-500">Here&apos;s your expense overview.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              Logout
+            </button>
           </div>
         </section>
 
-        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-8 shadow-md">
+        <section className="mb-10 rounded-3xl border border-white/70 bg-white/90 p-8 shadow-lg shadow-cyan-100 backdrop-blur">
           <h2 className="mb-2 text-xl font-semibold text-slate-900">Quick Actions</h2>
           <p className="mb-6 text-sm text-slate-500">Common tasks to manage your expenses</p>
           <div className="flex flex-wrap gap-4">
@@ -216,34 +208,40 @@ export const Dashboard = () => {
             >
               Tax Summary
             </button>
+            <button
+              onClick={() => navigate("/transactions")}
+              className="rounded-xl bg-gradient-to-r from-fuchsia-600 to-pink-600 px-6 py-3 font-medium text-white shadow-md transition-all duration-300 hover:from-fuchsia-700 hover:to-pink-700 hover:shadow-lg"
+            >
+              Transactions
+            </button>
           </div>
         </section>
 
         <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <div className="flex flex-col gap-2 rounded-2xl border border-cyan-100 bg-white/90 p-6 shadow-md shadow-cyan-100">
             <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <span className="h-2 w-2 rounded-full bg-blue-500" />
               Expenses
             </span>
             <p className="text-3xl font-bold text-slate-900 md:text-4xl">{formatCurrencyINR(totalExpenses)}</p>
           </div>
-          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <div className="flex flex-col gap-2 rounded-2xl border border-emerald-100 bg-white/90 p-6 shadow-md shadow-emerald-100">
             <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               This Month
             </span>
             <p className="text-3xl font-bold text-slate-900 md:text-4xl">{formatCurrencyINR(monthComparison.currentMonthTotal)}</p>
           </div>
-          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+          <div className="flex flex-col gap-2 rounded-2xl border border-violet-100 bg-white/90 p-6 shadow-md shadow-violet-100">
             <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <span className="h-2 w-2 rounded-full bg-yellow-400" />
+              <span className="h-2 w-2 rounded-full bg-violet-500" />
               Bills Uploaded
             </span>
             <p className="text-3xl font-bold text-slate-900 md:text-4xl">{billsCount}</p>
           </div>
         </section>
 
-        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+        <section className="mb-8 rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-indigo-100">
           <h2 className="text-xl font-semibold text-slate-900">Spending Insights & Trend Analysis</h2>
           <div className="mt-4 space-y-2 text-sm text-slate-700">
             <p>
@@ -267,7 +265,7 @@ export const Dashboard = () => {
           <CategoryPieChart data={categoryDistribution} />
         </section>
 
-        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+        <section className="mb-8 rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-violet-100">
           <h2 className="text-xl font-semibold text-slate-900">Smart Financial Insights Engine</h2>
           <ul className="mt-4 space-y-2 text-sm text-slate-700">
             {recurringMerchants.slice(0, 3).map((merchant) => (
@@ -299,11 +297,13 @@ export const Dashboard = () => {
           </div>
         </section>
 
-        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+        <section className="mb-10 rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-cyan-100">
           <h2 className="text-xl font-semibold text-slate-900">Reports & Summaries</h2>
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <div className="flex flex-col">
-              <label htmlFor="start-date" className="text-xs text-slate-600">Start Date</label>
+              <label htmlFor="start-date" className="text-xs text-slate-600">
+                Start Date
+              </label>
               <input
                 id="start-date"
                 type="date"
@@ -313,7 +313,9 @@ export const Dashboard = () => {
               />
             </div>
             <div className="flex flex-col">
-              <label htmlFor="end-date" className="text-xs text-slate-600">End Date</label>
+              <label htmlFor="end-date" className="text-xs text-slate-600">
+                End Date
+              </label>
               <input
                 id="end-date"
                 type="date"
@@ -345,11 +347,12 @@ export const Dashboard = () => {
             </button>
           </div>
           <p className="mt-3 text-sm text-slate-600">
-            Selected range total: <span className="font-semibold">{formatCurrencyINR(filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0))}</span>
+            Selected range total:{" "}
+            <span className="font-semibold">{formatCurrencyINR(filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0))}</span>
           </p>
         </section>
 
-        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+        <section className="mb-10 rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-fuchsia-100">
           <h2 className="text-xl font-semibold text-slate-900">Financial Decision Support</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -367,60 +370,7 @@ export const Dashboard = () => {
           </div>
         </section>
 
-        <section className="mb-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Recent Transactions</h2>
-              <p className="mt-1 text-sm text-slate-500">Your latest expense entries</p>
-            </div>
-            <button onClick={() => setShowAllTransactions((prev) => !prev)} className="text-sm font-medium text-blue-600 hover:text-blue-700">
-              {showAllTransactions ? "Show Less" : "View All"}
-            </button>
-          </div>
-          {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
-          {feedback ? <p className="mb-4 text-sm text-emerald-600">{feedback}</p> : null}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="px-4 py-4 text-left text-sm font-semibold">Date</th>
-                  <th className="px-4 py-4 text-left text-sm font-semibold">Merchant</th>
-                  <th className="px-4 py-4 text-left text-sm font-semibold">Category</th>
-                  <th className="px-4 py-4 text-right text-sm font-semibold">Amount</th>
-                  <th className="px-4 py-4 text-right text-sm font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((transaction) => (
-                  <tr key={transaction._id} className="border-b border-slate-100 transition-colors duration-150 hover:bg-slate-50">
-                    <td className="px-4 py-4 text-slate-700">{formatDateDDMMYYYY(transaction.expense_date)}</td>
-                    <td className="px-4 py-4">
-                      <span className="font-medium text-slate-900">{transaction.merchant}</span>
-                    </td>
-                    <td className="px-4 py-4 text-slate-700">{transaction.category?.name ?? "Unknown"}</td>
-                    <td className="px-4 py-4 text-right font-semibold text-slate-900">{formatCurrencyINR(transaction.amount)}</td>
-                    <td className="px-4 py-4 text-right">
-                      <button
-                        onClick={() => handleDelete(transaction._id)}
-                        disabled={deletingExpenseId === transaction._id}
-                        className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-60"
-                      >
-                        {deletingExpenseId === transaction._id ? "Deleting..." : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-6 text-slate-500" colSpan={5}>
-                      No expenses yet.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
       </div>
     </div>
   );

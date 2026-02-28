@@ -284,14 +284,33 @@ const TaxSummaryPage: React.FC = () => {
     window.print();
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/dashboard");
+  };
+
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-cyan-50 text-neutral-900">
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl shadow-cyan-100 backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Tax Saving Summary</h1>
-              <p className="mt-2 text-sm text-neutral-600">Identify potentially claimable expenses for income tax filing.</p>
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
+                aria-label="Go back"
+              >
+                <span className="text-base">&larr;</span>
+              </button>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Tax Planner</p>
+                <h1 className="text-3xl font-bold tracking-tight">Tax Saving Summary</h1>
+                <p className="mt-2 text-sm text-neutral-600">Identify potentially claimable expenses for income tax filing.</p>
+              </div>
             </div>
             <div className="w-full md:w-64">
               <label htmlFor="financialYear" className="mb-1 block text-sm font-medium text-neutral-700">

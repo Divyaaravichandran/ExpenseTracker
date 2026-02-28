@@ -113,12 +113,34 @@ const Expenses = () => {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    navigate("/login", { replace: true });
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-10 space-y-8">
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900">Add Expense</h1>
-          <p className="text-slate-600 mt-2">Create manual expense entries in your account.</p>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-sky-50">
+      <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
+        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl shadow-emerald-100 backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Manual Entry</p>
+              <h1 className="text-2xl font-bold text-slate-900">Add Expense</h1>
+              <p className="mt-2 text-sm text-slate-600">Create manual expense entries in your account.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigate("/dashboard")} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                Dashboard
+              </button>
+              <button type="button" onClick={() => navigate("/transactions")} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                Transactions
+              </button>
+              <button type="button" onClick={handleLogout} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700">
+                Logout
+              </button>
+            </div>
+          </div>
 
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
           {success && <p className="mt-4 text-sm text-emerald-600">{success}</p>}
@@ -186,7 +208,7 @@ const Expenses = () => {
           </form>
         </section>
 
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-sky-100 backdrop-blur">
           <h2 className="text-xl font-semibold text-slate-900">Manual Expenses</h2>
           {listLoading ? <p className="mt-4 text-slate-500">Loading expenses...</p> : null}
 

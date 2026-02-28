@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { confirmBill, getBills, getCategories, uploadBill } from "../../services/bills.service";
-import { Category, ConfirmBillPayload, ConfirmBillResult, Receipt, UploadBillResult } from "../../types/bill";
+import { confirmBill, getCategories, uploadBill } from "../../services/bills.service";
+import { Category, ConfirmBillPayload, ConfirmBillResult, UploadBillResult } from "../../types/bill";
 import { formatDateDDMMYYYY, toInputDateValue } from "../../utils/formatDate";
 
 const matchCategoryId = (parsedCategoryName: string, categories: Category[]): string => {
@@ -30,8 +30,6 @@ const UploadBill = () => {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [bills, setBills] = useState<Receipt[]>([]);
-  const [listLoading, setListLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadBillResult | null>(null);
@@ -43,20 +41,6 @@ const UploadBill = () => {
     category_id: ""
   });
   const [confidence, setConfidence] = useState<string>("0");
-
-  const loadBills = async (): Promise<Receipt[]> => {
-    setListLoading(true);
-    try {
-      const data = await getBills();
-      setBills(data);
-      return data;
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to load bills");
-      return [];
-    } finally {
-      setListLoading(false);
-    }
-  };
 
   const loadCategories = async (): Promise<Category[]> => {
     setCategoriesLoading(true);
@@ -79,7 +63,7 @@ const UploadBill = () => {
       return;
     }
 
-    void Promise.all([loadBills(), loadCategories()]);
+    void loadCategories();
   }, [navigate]);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -131,7 +115,13 @@ const UploadBill = () => {
   };
 
   const isParsedFormValid = useMemo(() => {
-    return Boolean(uploadResult?.receiptId) && parsedForm.merchant.trim().length > 0 && parsedForm.amount > 0 && parsedForm.date.trim().length > 0 && parsedForm.category_id.trim().length > 0;
+    return (
+      Boolean(uploadResult?.receiptId) &&
+      parsedForm.merchant.trim().length > 0 &&
+      parsedForm.amount > 0 &&
+      parsedForm.date.trim().length > 0 &&
+      parsedForm.category_id.trim().length > 0
+    );
   }, [parsedForm, uploadResult?.receiptId]);
 
   const handleNext = async () => {
@@ -158,17 +148,12 @@ const UploadBill = () => {
       };
 
       const response = await confirmBill(uploadResult.receiptId, payload);
-      const refreshedBills = await loadBills();
-      const confirmedReceipt = refreshedBills.find((bill) => bill._id === uploadResult.receiptId);
-      const parsedResult = response.parsedResult ?? confirmedReceipt?.parsedData ?? undefined;
+      setConfirmResult(response);
+      setSuccess("Bill saved successfully. Refreshing...");
 
-      if (!parsedResult) {
-        setError("Saving finished, but parsed result is missing in response.");
-        return;
-      }
-
-      setConfirmResult({ ...response, parsedResult });
-      setSuccess("Bill saved successfully.");
+      setTimeout(() => {
+        window.location.reload();
+      }, 900);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to save bill");
     } finally {
@@ -176,17 +161,52 @@ const UploadBill = () => {
     }
   };
 
-  const apiBaseUrl = ((import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL || "http://localhost:4000");
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    navigate("/login", { replace: true });
+  };
+
+  const apiBaseUrl = ((import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL ||
+    "http://localhost:4000");
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-10 space-y-8">
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900">Upload Bill</h1>
-          <p className="text-slate-600 mt-2">Upload receipt image and store it in your account.</p>
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl shadow-emerald-100 backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-emerald-600">Expense Management</p>
+              <h1 className="text-2xl font-bold text-slate-900">Upload Bill</h1>
+              <p className="mt-2 text-sm text-slate-600">Upload a receipt image, review parsed details, and save as transaction.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/transactions")}
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Transactions
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
 
-          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-          {success && <p className="mt-4 text-sm text-emerald-600">{success}</p>}
+          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+          {success ? <p className="mt-4 text-sm text-emerald-600">{success}</p> : null}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <input
@@ -199,14 +219,14 @@ const UploadBill = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                className="rounded-lg bg-blue-600 px-5 py-2.5 text-white hover:bg-blue-700 disabled:opacity-60"
               >
                 {loading ? "Uploading..." : "Upload Bill"}
               </button>
               <button
                 type="button"
                 onClick={() => navigate("/dashboard")}
-                className="border border-slate-300 px-5 py-2.5 rounded-lg hover:bg-slate-100"
+                className="rounded-lg border border-slate-300 px-5 py-2.5 hover:bg-slate-100"
               >
                 Back
               </button>
@@ -214,31 +234,31 @@ const UploadBill = () => {
           </form>
 
           {uploadResult ? (
-            <div className="mt-6 rounded-xl border border-slate-200 p-4 space-y-4">
+            <div className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
               <h3 className="text-lg font-semibold text-slate-900">Parsed Result</h3>
 
               {uploadResult.imageUrl ? (
-                <img
-                  src={`${apiBaseUrl}${uploadResult.imageUrl}`}
-                  alt="Uploaded bill"
-                  className="max-h-64 rounded-lg border border-slate-200"
-                />
+                <img src={`${apiBaseUrl}${uploadResult.imageUrl}`} alt="Uploaded bill" className="max-h-64 rounded-lg border border-slate-200" />
               ) : null}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="merchant" className="text-sm font-medium text-slate-700">Merchant</label>
+                  <label htmlFor="merchant" className="text-sm font-medium text-slate-700">
+                    Merchant
+                  </label>
                   <input
                     id="merchant"
                     type="text"
                     value={parsedForm.merchant}
                     onChange={(e) => handleParsedChange("merchant", e.target.value)}
-                    className="border border-slate-300 rounded-lg px-3 py-2"
+                    className="rounded-lg border border-slate-300 px-3 py-2"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="amount" className="text-sm font-medium text-slate-700">Amount</label>
+                  <label htmlFor="amount" className="text-sm font-medium text-slate-700">
+                    Amount
+                  </label>
                   <input
                     id="amount"
                     type="number"
@@ -246,31 +266,33 @@ const UploadBill = () => {
                     step="0.01"
                     value={parsedForm.amount > 0 ? parsedForm.amount : ""}
                     onChange={(e) => handleParsedChange("amount", e.target.value)}
-                    className="border border-slate-300 rounded-lg px-3 py-2"
+                    className="rounded-lg border border-slate-300 px-3 py-2"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="expense-date" className="text-sm font-medium text-slate-700">Date</label>
+                  <label htmlFor="expense-date" className="text-sm font-medium text-slate-700">
+                    Date
+                  </label>
                   <input
                     id="expense-date"
                     type="date"
                     value={parsedForm.date}
                     onChange={(e) => handleParsedChange("date", e.target.value)}
-                    className="border border-slate-300 rounded-lg px-3 py-2"
+                    className="rounded-lg border border-slate-300 px-3 py-2"
                   />
-                  <p className="text-xs text-slate-500">
-                    Parsed: {parsedForm.date ? formatDateDDMMYYYY(parsedForm.date) : "N/A"}
-                  </p>
+                  <p className="text-xs text-slate-500">Parsed: {parsedForm.date ? formatDateDDMMYYYY(parsedForm.date) : "N/A"}</p>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="category" className="text-sm font-medium text-slate-700">Category</label>
+                  <label htmlFor="category" className="text-sm font-medium text-slate-700">
+                    Category
+                  </label>
                   <select
                     id="category"
                     value={parsedForm.category_id}
                     onChange={(e) => handleParsedChange("category_id", e.target.value)}
-                    className="border border-slate-300 rounded-lg px-3 py-2"
+                    className="rounded-lg border border-slate-300 px-3 py-2"
                     disabled={categoriesLoading || categories.length === 0}
                   >
                     {categories.map((category) => (
@@ -282,13 +304,15 @@ const UploadBill = () => {
                 </div>
 
                 <div className="flex flex-col gap-1 md:col-span-2">
-                  <label htmlFor="confidence" className="text-sm font-medium text-slate-700">Confidence</label>
+                  <label htmlFor="confidence" className="text-sm font-medium text-slate-700">
+                    Confidence
+                  </label>
                   <input
                     id="confidence"
                     type="text"
                     value={confidence}
                     readOnly
-                    className="border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 text-slate-600"
+                    className="rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-slate-600"
                   />
                 </div>
               </div>
@@ -298,7 +322,7 @@ const UploadBill = () => {
                   type="button"
                   onClick={handleNext}
                   disabled={!isParsedFormValid || confirming}
-                  className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg hover:bg-emerald-700 disabled:opacity-60"
+                  className="rounded-lg bg-emerald-600 px-5 py-2.5 text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
                   {confirming ? "Saving..." : "Next"}
                 </button>
@@ -307,51 +331,15 @@ const UploadBill = () => {
           ) : null}
 
           {confirmResult ? (
-            <div className="mt-6 rounded-xl border border-slate-200 p-4 space-y-2">
+            <div className="mt-6 space-y-2 rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="text-lg font-semibold text-slate-900">Saved Result</h3>
               <p className="text-slate-700">Merchant: {confirmResult.parsedResult?.merchant ?? "N/A"}</p>
               <p className="text-slate-700">Amount: {confirmResult.parsedResult?.amount ?? "N/A"}</p>
-              <p className="text-slate-700">Date: {confirmResult.parsedResult?.date ? formatDateDDMMYYYY(confirmResult.parsedResult.date) : "N/A"}</p>
+              <p className="text-slate-700">
+                Date: {confirmResult.parsedResult?.date ? formatDateDDMMYYYY(confirmResult.parsedResult.date) : "N/A"}
+              </p>
               <p className="text-slate-700">Category: {confirmResult.parsedResult?.category ?? "N/A"}</p>
               <p className="text-slate-700">Confidence: {confirmResult.parsedResult?.confidence ?? "N/A"}</p>
-            </div>
-          ) : null}
-        </section>
-
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Show All Bills</h2>
-          {listLoading ? <p className="mt-4 text-slate-500">Loading bills...</p> : null}
-
-          {!listLoading && bills.length === 0 ? <p className="mt-4 text-slate-500">No bills uploaded yet.</p> : null}
-
-          {bills.length > 0 ? (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="text-left py-3">Uploaded At</th>
-                    <th className="text-left py-3">Status</th>
-                    <th className="text-left py-3">Receipt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bills.map((bill) => (
-                    <tr key={bill._id} className="border-b border-slate-100">
-                      <td className="py-3 text-slate-800">{formatDateDDMMYYYY(bill.uploadedAt)}</td>
-                      <td className="py-3 text-slate-800">{bill.status}</td>
-                      <td className="py-3">
-                        {bill.imageUrl ? (
-                          <a href={`${apiBaseUrl}${bill.imageUrl}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                            View Image
-                          </a>
-                        ) : (
-                          <span className="text-slate-500">N/A</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           ) : null}
         </section>
