@@ -1,21 +1,51 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deleteExpense, getCategories, getExpenses } from "../../services/bills.service";
+import { deleteExpense, getBills, getCategories, getExpenses } from "../../services/bills.service";
 import { Category, Expense } from "../../types/bill";
 import { formatCurrencyINR } from "../../utils/currency";
-import { formatDateDDMMYYYY } from "../../utils/formatDate";
+import { formatDateDDMMYYYY, toInputDateValue } from "../../utils/formatDate";
+import {
+  detectRecurringMerchants,
+  filterExpensesByDateRange,
+  getCategoryDistribution,
+  getMonthComparison,
+  getTopMerchants
+} from "../../utils/analytics";
 
 type TransactionFilter = "all" | "manual" | "uploaded";
+
+const downloadCsv = (filename: string, rows: string[][]): void => {
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, "\"\"")}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+};
 
 const Transactions: React.FC = () => {
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [billsCount, setBillsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<TransactionFilter>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>(toInputDateValue(new Date()));
+
+  useEffect(() => {
+    const now = new Date();
+    setStartDate(toInputDateValue(new Date(now.getFullYear(), now.getMonth(), 1)));
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -28,12 +58,14 @@ const Transactions: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const [expenseList, categoryList] = await Promise.all([getExpenses(), getCategories()]);
+        const [expenseList, categoryList, billList] = await Promise.all([getExpenses(), getCategories(), getBills()]);
         setExpenses(expenseList);
         setCategories(categoryList);
+        setBillsCount(billList.length);
       } catch (loadError: any) {
         setExpenses([]);
         setCategories([]);
+        setBillsCount(0);
         setError(loadError?.response?.data?.message || "Failed to load transactions");
       } finally {
         setLoading(false);
@@ -67,6 +99,71 @@ const Transactions: React.FC = () => {
     () => filteredTransactions.reduce((sum, expense) => sum + expense.amount, 0),
     [filteredTransactions]
   );
+  const thisMonthExpenses = useMemo(() => {
+    const now = new Date();
+    return expenses.filter((expense) => {
+      const date = new Date(expense.expense_date);
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    });
+  }, [expenses]);
+  const monthComparison = useMemo(() => getMonthComparison(expenses), [expenses]);
+  const filteredReportExpenses = useMemo(
+    () => filterExpensesByDateRange(expenses, startDate || undefined, endDate || undefined),
+    [endDate, expenses, startDate]
+  );
+
+  const handleExportMonthlySummaryCsv = () => {
+    const topMerchants = getTopMerchants(thisMonthExpenses, 5);
+    const categoryDistribution = getCategoryDistribution(thisMonthExpenses);
+    const recurringMerchants = detectRecurringMerchants(thisMonthExpenses);
+    const thisMonthTotal = thisMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+    const rows: string[][] = [
+      ["Monthly Summary Report"],
+      ["Month", new Date().toLocaleString("en-IN", { month: "long", year: "numeric" })],
+      ["Total Expenses", thisMonthTotal.toFixed(2)],
+      ["Bills Uploaded", String(billsCount)],
+      ["Current Month", monthComparison.currentMonthTotal.toFixed(2)],
+      ["Previous Month", monthComparison.previousMonthTotal.toFixed(2)],
+      ["MoM Percent Change", `${monthComparison.percentChange.toFixed(2)}%`],
+      [],
+      ["Category Breakdown"],
+      ["Category", "Total", "Share %"],
+      ...categoryDistribution.map((item) => [item.category, item.total.toFixed(2), item.sharePercent.toFixed(2)]),
+      [],
+      ["Top 5 Merchants"],
+      ["Merchant", "Visits", "Total Amount"],
+      ...topMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)]),
+      [],
+      ["Recurring Expenses"],
+      ["Merchant", "Visits", "Total Amount"],
+      ...recurringMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)])
+    ];
+
+    downloadCsv(`monthly-summary-${toInputDateValue(new Date())}.csv`, rows);
+  };
+
+  const handleExportDateRangeCsv = () => {
+    const distribution = getCategoryDistribution(filteredReportExpenses);
+    const topMerchants = getTopMerchants(filteredReportExpenses, 5);
+
+    const rows: string[][] = [
+      ["Date Range Report"],
+      ["Start Date", startDate ? formatDateDDMMYYYY(startDate) : "N/A"],
+      ["End Date", endDate ? formatDateDDMMYYYY(endDate) : "N/A"],
+      ["Total Expenses", filteredReportExpenses.reduce((sum, expense) => sum + expense.amount, 0).toFixed(2)],
+      [],
+      ["Category Breakdown"],
+      ["Category", "Total", "Share %"],
+      ...distribution.map((item) => [item.category, item.total.toFixed(2), item.sharePercent.toFixed(2)]),
+      [],
+      ["Top Merchants"],
+      ["Merchant", "Visits", "Total Amount"],
+      ...topMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)])
+    ];
+
+    downloadCsv(`date-range-report-${startDate || "start"}-to-${endDate || "end"}.csv`, rows);
+  };
 
   const handleDelete = async (expenseId: string) => {
     const shouldDelete = window.confirm("Delete this transaction?");
@@ -87,12 +184,6 @@ const Transactions: React.FC = () => {
     } finally {
       setDeletingExpenseId(null);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    navigate("/login", { replace: true });
   };
 
   return (
@@ -119,13 +210,6 @@ const Transactions: React.FC = () => {
                 className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
               >
                 Add Expense
-              </button>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
-              >
-                Logout
               </button>
             </div>
           </div>
@@ -238,6 +322,64 @@ const Transactions: React.FC = () => {
               </table>
             </div>
           ) : null}
+        </section>
+
+        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-indigo-100 backdrop-blur">
+          <h2 className="text-xl font-semibold text-slate-900">Reports & Summaries</h2>
+          <p className="mt-1 text-sm text-slate-600">Generate monthly and date-range reports directly from transactions data.</p>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+            <div className="flex flex-col">
+              <label htmlFor="tx-start-date" className="text-xs text-slate-600">
+                Start Date
+              </label>
+              <input
+                id="tx-start-date"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label htmlFor="tx-end-date" className="text-xs text-slate-600">
+                End Date
+              </label>
+              <input
+                id="tx-end-date"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleExportMonthlySummaryCsv}
+              className="rounded-lg border border-indigo-700 bg-indigo-700 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-800"
+            >
+              Download Monthly CSV
+            </button>
+            <button
+              type="button"
+              onClick={handleExportDateRangeCsv}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Download Date Range CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Download PDF
+            </button>
+          </div>
+          <p className="mt-3 text-sm text-slate-600">
+            Selected range total:{" "}
+            <span className="font-semibold">
+              {formatCurrencyINR(filteredReportExpenses.reduce((sum, expense) => sum + expense.amount, 0))}
+            </span>
+          </p>
         </section>
       </div>
     </div>

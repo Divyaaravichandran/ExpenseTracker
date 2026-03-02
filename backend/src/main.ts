@@ -1,6 +1,9 @@
-﻿import "dotenv/config";
+import "dotenv/config";
 import app from "./app";
-const port = process.env.PORT ? Number(process.env.PORT) : 4000;
+import { env } from "./libs/core/env";
+import { logger } from "./libs/core/logger";
+
+const port = env.apiPort;
 app.listen(port, () => {
-  console.log(`API server running on port ${port}`);
+  logger.info(`API server running on port ${port}`);
 });

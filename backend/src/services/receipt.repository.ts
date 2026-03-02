@@ -58,6 +58,10 @@ export const findReceiptByIdAndUser = async (receiptId: string, userId: string):
   });
 };
 
+export const findReceiptById = async (receiptId: string): Promise<IReceipt | null> => {
+  return Receipt.findById(new Types.ObjectId(receiptId));
+};
+
 export const deleteReceiptByIdAndUser = async (receiptId: string, userId: string): Promise<boolean> => {
   const result = await Receipt.deleteOne({
     _id: new Types.ObjectId(receiptId),

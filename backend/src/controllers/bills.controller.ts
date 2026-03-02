@@ -20,7 +20,7 @@ export const uploadBill = asyncHandler(async (req: Request, res: Response) => {
 
   const result = await processUploadedBill(getUserId(req), req.file);
 
-  res.status(201).json(result);
+  res.status(202).json(result);
 });
 
 export const listBills = asyncHandler(async (req: Request, res: Response) => {

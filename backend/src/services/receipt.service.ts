@@ -4,22 +4,18 @@ import { IExpense } from "../models/Expense";
 import { HttpError } from "../utils/HttpError";
 import { categoryExistsById } from "./expense.repository";
 import { findCategoryById, findCategoryByName } from "./category.repository";
-import { createReceipt, findReceiptByIdAndUser, findReceiptsByUser, updateReceiptById } from "./receipt.repository";
+import { createReceipt, findReceiptById, findReceiptByIdAndUser, findReceiptsByUser, updateReceiptById } from "./receipt.repository";
 import { OcrService } from "./ocr.service";
 import { parseBill } from "./huggingface/parseBill";
 import { ConfirmBillInput } from "../validators/bills.validators";
 import { createExpenseWithTax } from "./expense.service";
+import { createJob } from "../modules/jobs/jobs.repository";
+import { IJob, JobExtractedData } from "../models/Job";
 
-interface UploadBillProcessingResult {
-  receiptId: string;
-  imageUrl: string | null;
-  parsedResult: {
-    merchant: string;
-    amount: number | null;
-    date: string | null;
-    category: string;
-    confidence: string;
-  };
+interface UploadBillQueuedResult {
+  success: boolean;
+  message: string;
+  jobId: string;
 }
 
 interface ConfirmBillResult {
@@ -34,7 +30,23 @@ interface ConfirmBillResult {
   expense: IExpense;
 }
 
-export const processUploadedBill = async (userId: string, file: Express.Multer.File): Promise<UploadBillProcessingResult> => {
+const normalizeParsedResult = (parsed: {
+  merchant?: string;
+  amount?: number | null;
+  date?: string | null;
+  category?: string;
+  categoryConfidence?: string;
+}): JobExtractedData["parsedResult"] => {
+  return {
+    merchant: parsed.merchant || "Unknown Merchant",
+    amount: parsed.amount ?? null,
+    date: parsed.date ?? null,
+    category: parsed.category || "Other",
+    confidence: parsed.categoryConfidence || "0"
+  };
+};
+
+export const processUploadedBill = async (userId: string, file: Express.Multer.File): Promise<UploadBillQueuedResult> => {
   if (!Types.ObjectId.isValid(userId)) {
     throw new HttpError(401, "Invalid user id in token");
   }
@@ -44,34 +56,49 @@ export const processUploadedBill = async (userId: string, file: Express.Multer.F
   const receipt = await createReceipt({
     userId,
     imageUrl,
-    status: "PROCESSING",
+    status: "UPLOADED",
     uploadedAt: new Date(),
     expenseId: null,
     extractedText: null,
     parsedData: null
   });
 
-  const extractedText = await OcrService.extractText(file.path);
-  const parsed = await parseBill(extractedText);
-  const parsedResult = {
-    merchant: parsed.merchant || "Unknown Merchant",
-    amount: parsed.amount,
-    date: parsed.date,
-    category: parsed.category || "Other",
-    confidence: parsed.categoryConfidence || "0"
-  };
+  const job = await createJob({
+    userId,
+    receiptId: String(receipt._id),
+    filePath: file.path
+  });
 
-  const updatedReceipt = await updateReceiptById(String(receipt._id), {
+  return {
+    success: true,
+    message: "Bill uploaded successfully. Processing in background.",
+    jobId: String(job._id)
+  };
+};
+
+export const processReceiptJob = async (job: IJob): Promise<JobExtractedData> => {
+  const receiptId = String(job.receiptId);
+  const receipt = await findReceiptById(receiptId);
+  if (!receipt) {
+    throw new Error("Receipt not found for queued job");
+  }
+
+  const extractedText = await OcrService.extractText(job.filePath);
+  const parsed = await parseBill(extractedText);
+  const parsedResult = normalizeParsedResult(parsed);
+
+  const updatedReceipt = await updateReceiptById(receiptId, {
+    status: "PROCESSING",
     extractedText,
     parsedData: parsedResult
   });
 
   if (!updatedReceipt) {
-    throw new HttpError(500, "Failed to update receipt after OCR parsing");
+    throw new Error("Failed to update receipt after OCR parsing");
   }
 
   return {
-    receiptId: String(updatedReceipt._id),
+    receiptId,
     imageUrl: updatedReceipt.imageUrl,
     parsedResult
   };

@@ -1,6 +1,15 @@
 import api from "../api/axios";
 import { ENDPOINTS } from "../api/endpoints";
-import { Category, ConfirmBillPayload, ConfirmBillResult, CreateManualExpensePayload, Expense, Receipt, UploadBillResult } from "../types/bill";
+import {
+  BillProcessingJob,
+  Category,
+  ConfirmBillPayload,
+  ConfirmBillResult,
+  CreateManualExpensePayload,
+  Expense,
+  Receipt,
+  UploadBillResult
+} from "../types/bill";
 
 export const uploadBill = async (file: File): Promise<UploadBillResult> => {
   const formData = new FormData();
@@ -18,6 +27,29 @@ export const uploadBill = async (file: File): Promise<UploadBillResult> => {
 export const confirmBill = async (receiptId: string, payload: ConfirmBillPayload): Promise<ConfirmBillResult> => {
   const response = await api.post(`${ENDPOINTS.bills.confirm}/${receiptId}`, payload);
   return response.data as ConfirmBillResult;
+};
+
+export const getBillJobStatus = async (jobId: string): Promise<BillProcessingJob> => {
+  const response = await api.get(`${ENDPOINTS.jobs.base}/${jobId}`);
+  return response.data as BillProcessingJob;
+};
+
+export interface TaxRulePreview {
+  _id: string;
+  financialYear: string;
+  section: string;
+  title: string;
+  applicableCategories: string[];
+  maxLimit: number;
+  limitType: "yearly";
+  isActive: boolean;
+}
+
+export const getTaxRulesForFinancialYear = async (financialYear: string): Promise<TaxRulePreview[]> => {
+  const response = await api.get(ENDPOINTS.taxRules.base, {
+    params: { financialYear }
+  });
+  return response.data as TaxRulePreview[];
 };
 
 export const getBills = async (): Promise<Receipt[]> => {

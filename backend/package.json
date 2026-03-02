@@ -4,6 +4,7 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "worker:dev": "ts-node-dev --respawn --transpile-only -r dotenv/config ../worker/src/main.ts",
     "build": "tsc",
     "start": "node dist/main.js"
   },

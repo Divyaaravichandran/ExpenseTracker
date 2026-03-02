@@ -9,7 +9,15 @@ export class OcrService {
 
     try {
       processedPath = await ImagePreprocessService.preprocessImage(imagePath);
-      const result = await Tesseract.recognize(processedPath, "eng");
+      const result = await Tesseract.recognize(
+        processedPath,
+        "eng",
+        {
+          tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+          preserve_interword_spaces: "1",
+          user_defined_dpi: "300"
+        } as any
+      );
 
       return result.data.text
         .replace(/\r/g, "\n")

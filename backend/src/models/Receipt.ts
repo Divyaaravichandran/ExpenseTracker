@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema, Types } from "mongoose";
 
-export type ReceiptStatus = "UPLOADED" | "PROCESSING" | "COMPLETED";
+export type ReceiptStatus = "UPLOADED" | "PROCESSING" | "COMPLETED" | "FAILED";
 
 export interface ParsedReceiptData {
   merchant: string;
@@ -27,7 +27,7 @@ const ReceiptSchema = new Schema<IReceipt>(
     imageUrl: { type: String, default: null, trim: true },
     status: {
       type: String,
-      enum: ["UPLOADED", "PROCESSING", "COMPLETED"],
+      enum: ["UPLOADED", "PROCESSING", "COMPLETED", "FAILED"],
       default: "UPLOADED",
       required: true
     },

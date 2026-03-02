@@ -1,4 +1,4 @@
-export type ReceiptStatus = "UPLOADED" | "PROCESSING" | "COMPLETED";
+export type ReceiptStatus = "UPLOADED" | "PROCESSING" | "COMPLETED" | "FAILED";
 
 export interface ParsedReceiptData {
   merchant: string;
@@ -20,9 +20,24 @@ export interface Receipt {
 }
 
 export interface UploadBillResult {
-  receiptId: string;
-  imageUrl: string | null;
-  parsedResult: ParsedReceiptData;
+  success: boolean;
+  message: string;
+  jobId: string;
+}
+
+export type JobStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+export interface BillProcessingJob {
+  jobId: string;
+  status: JobStatus;
+  extractedData: {
+    receiptId: string;
+    imageUrl: string | null;
+    parsedResult: ParsedReceiptData;
+  } | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ConfirmBillResult {
