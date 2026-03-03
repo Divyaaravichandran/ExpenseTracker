@@ -12,7 +12,7 @@ export class ImagePreprocessService {
       await fs.mkdir(uploadsDir, { recursive: true });
 
       await sharp(inputPath)
-        .resize({ width: 1200 })
+        .resize({ width: 1000, withoutEnlargement: true })
         .grayscale()
         .normalize()
         .modulate({ brightness: 1.05 })

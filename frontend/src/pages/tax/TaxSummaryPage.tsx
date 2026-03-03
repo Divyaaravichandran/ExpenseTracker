@@ -11,9 +11,8 @@ import {
   TaxTimelinePoint
 } from "../../services/reports.service";
 import { formatDateDDMMYYYY } from "../../utils/formatDate";
-import taxSummaryBg from "../../assets/tax-summary-bg.png";
 
-const BRAND_BLUE = "#2563EB";
+const BRAND_BLUE = "#818CF8";
 
 const getFinancialYear = (date: Date): string => {
   const year = date.getFullYear();
@@ -52,35 +51,35 @@ const SectionCard: React.FC<SectionCardProps> = ({ section, isActive, onClick })
     <button
       type="button"
       onClick={() => onClick(section.section)}
-      className={`rounded-2xl border p-6 text-left shadow-[0_10px_30px_rgba(2,6,23,0.08)] transition hover:shadow-lg ${
+      className={`rounded-2xl border p-5 text-left transition ${
         isActive
-          ? `border-blue-300 bg-blue-50/60 ring-1 ring-blue-200`
-          : "border-slate-100 bg-white hover:border-blue-300"
+          ? "border-cyan-500/60 bg-[#17305a] shadow-[0_12px_28px_rgba(56,189,248,0.18)]"
+          : "border-[#2f4a78] bg-[#162746] hover:border-indigo-400/60"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Section {section.section}</h2>
-          <p className="text-sm text-slate-500">{section.title}</p>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-white">Section {section.section}</h2>
+          <p className="text-sm text-slate-400">{section.title}</p>
         </div>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+        <span className="rounded-full border border-[#3a5a90] bg-[#112447] px-2 py-0.5 text-[11px] text-slate-300">
           {section.utilizationPercent.toFixed(0)}% utilized
         </span>
       </div>
 
-      <div className="mt-5 space-y-2 text-sm text-slate-600">
+      <div className="mt-4 space-y-1.5 text-sm text-slate-300">
         <p>
-          Total Spent: <span className="font-medium text-slate-900">{formatCurrency(section.totalSpent)}</span>
+          Total Spent: <span className="font-medium text-white">{formatCurrency(section.totalSpent)}</span>
         </p>
         <p>
-          Max Limit: <span className="font-medium text-slate-900">{formatCurrency(section.maxLimit)}</span>
+          Max Limit: <span className="font-medium text-white">{formatCurrency(section.maxLimit)}</span>
         </p>
         <p>
-          Remaining Amount: <span className="font-medium text-slate-900">{formatCurrency(section.remainingEligible)}</span>
+          Remaining Amount: <span className="font-medium text-white">{formatCurrency(section.remainingEligible)}</span>
         </p>
       </div>
 
-      <div className="mt-5 h-1.5 w-full rounded-full bg-slate-200">
+      <div className="mt-4 h-1.5 w-full rounded-full bg-[#0f1f3f]">
         <div
           className="h-full rounded-full transition-all duration-300"
           style={{ backgroundColor: BRAND_BLUE, width: `${Math.min(section.utilizationPercent, 100)}%` }}
@@ -91,7 +90,7 @@ const SectionCard: React.FC<SectionCardProps> = ({ section, isActive, onClick })
 };
 
 const SkeletonBlock: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <div className={`animate-pulse rounded-xl bg-neutral-200 ${className}`} />
+  <div className={`animate-pulse rounded-xl bg-[#1a315a] ${className}`} />
 );
 
 const SectionPieChart: React.FC<{ sections: TaxSectionSummary[] }> = ({ sections }) => {
@@ -112,26 +111,26 @@ const SectionPieChart: React.FC<{ sections: TaxSectionSummary[] }> = ({ sections
   });
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
-      <h3 className="text-sm font-semibold text-slate-900">Spend by Section</h3>
+    <div className="rounded-2xl border border-[#2f4a78] bg-[#162746] p-6">
+      <h3 className="text-sm font-semibold text-slate-200">Spend by Section</h3>
       <div className="mt-5 flex flex-col items-center gap-5 md:flex-row md:items-start">
         <div className="relative h-44 w-44">
           <div
             className="h-44 w-44 rounded-full"
             style={{
-              background: gradientParts.length > 0 ? `conic-gradient(${gradientParts.join(", ")})` : "#e2e8f0"
+              background: gradientParts.length > 0 ? `conic-gradient(${gradientParts.join(", ")})` : "#1f3761"
             }}
           />
-          <div className="absolute inset-[24%] rounded-full bg-white shadow-inner" />
+          <div className="absolute inset-[24%] rounded-full bg-[#0f1f3f] shadow-inner" />
         </div>
         <div className="w-full space-y-2">
           {slices.map((slice) => (
             <div key={slice.section} className="flex items-center justify-between text-sm">
-              <span className="inline-flex items-center gap-2 text-slate-600">
+              <span className="inline-flex items-center gap-2 text-slate-300">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: slice.color }} />
                 {slice.section}
               </span>
-              <span className="font-medium text-slate-900">{slice.value.toFixed(1)}%</span>
+              <span className="font-medium text-white">{slice.value.toFixed(1)}%</span>
             </div>
           ))}
         </div>
@@ -144,19 +143,19 @@ const UtilizationTimelineChart: React.FC<{ timeline: TaxTimelinePoint[] }> = ({ 
   const maxSpent = Math.max(...timeline.map((item) => item.totalSpent), 0);
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
-      <h3 className="text-sm font-semibold text-slate-900">Utilization Over Time</h3>
+    <div className="rounded-2xl border border-[#2f4a78] bg-[#162746] p-6">
+      <h3 className="text-sm font-semibold text-slate-200">Utilization Over Time</h3>
       <div className="mt-5 space-y-3">
-        {timeline.length === 0 ? <p className="text-sm text-slate-500">No timeline data yet.</p> : null}
+        {timeline.length === 0 ? <p className="text-sm text-slate-400">No timeline data yet.</p> : null}
         {timeline.map((item) => {
           const width = maxSpent > 0 ? (item.totalSpent / maxSpent) * 100 : 0;
           return (
             <div key={item.month} className="grid grid-cols-[70px_1fr_95px] items-center gap-2 text-sm sm:grid-cols-[80px_1fr_120px] sm:gap-3">
-              <span className="text-slate-600">{item.month}</span>
-              <div className="h-1.5 rounded-full bg-slate-200">
+              <span className="text-slate-300">{item.month}</span>
+              <div className="h-1.5 rounded-full bg-[#0f1f3f]">
                 <div className="h-full rounded-full" style={{ backgroundColor: BRAND_BLUE, width: `${Math.max(width, 2)}%` }} />
               </div>
-              <span className="text-right font-medium text-slate-900">{formatCurrency(item.totalSpent)}</span>
+              <span className="text-right font-medium text-white">{formatCurrency(item.totalSpent)}</span>
             </div>
           );
         })}
@@ -301,44 +300,34 @@ const TaxSummaryPage: React.FC = () => {
   };
 
   return (
-    <div
-      className="min-h-screen text-slate-900"
-      style={{
-        backgroundColor: "#F8FAFC",
-        backgroundImage: `linear-gradient(120deg, rgba(15,23,42,0.25), rgba(15,23,42,0.15)), url(${taxSummaryBg})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundAttachment: "fixed"
-      }}
-    >
-      <div className="mx-auto max-w-7xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
-        <section className="rounded-3xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
+    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_15%_0%,rgba(99,102,241,0.32),transparent_45%),radial-gradient(1000px_560px_at_92%_90%,rgba(20,184,166,0.2),transparent_50%),linear-gradient(135deg,#030712_0%,#0a1226_50%,#0a1a33_100%)] text-slate-100">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="rounded-3xl border border-[#2d4674] bg-[#0a1530] p-6 shadow-[0_24px_55px_rgba(2,8,24,0.55)] sm:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
               <button
                 type="button"
                 onClick={handleBack}
-                className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#37598d] bg-[#112447] text-slate-200 hover:bg-[#1a335f]"
                 aria-label="Go back"
               >
                 <span className="text-base">&larr;</span>
               </button>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: BRAND_BLUE }}>Tax Planner</p>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Tax Saving Summary</h1>
-                <p className="mt-2 text-sm text-slate-500">Identify potentially claimable expenses for income tax filing.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Tax Planner</p>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Tax Saving Summary</h1>
+                <p className="mt-2 text-sm text-slate-300">Identify potentially claimable expenses for income tax filing.</p>
               </div>
             </div>
             <div className="w-full md:w-64">
-              <label htmlFor="financialYear" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="financialYear" className="mb-1 block text-xs uppercase tracking-[0.08em] text-slate-400">
                 Financial Year
               </label>
               <select
                 id="financialYear"
                 value={year}
                 onChange={(event) => setYear(event.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-xl border border-[#3b5b90] bg-[#112447] px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-400"
               >
                 {yearOptions.map((option) => (
                   <option key={option} value={option}>
@@ -352,7 +341,7 @@ const TaxSummaryPage: React.FC = () => {
                 type="button"
                 onClick={handleExportCsv}
                 disabled={!summary}
-                className="rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-10 rounded-xl border border-[#3b5b90] bg-[#112447] px-4 text-sm font-semibold text-slate-100 transition hover:bg-[#1a335f] disabled:opacity-50"
               >
                 Export CSV
               </button>
@@ -360,8 +349,7 @@ const TaxSummaryPage: React.FC = () => {
                 type="button"
                 onClick={handleExportPdf}
                 disabled={!summary}
-                className="rounded-lg px-3 py-2 text-xs font-medium text-white shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ backgroundColor: BRAND_BLUE }}
+                className="h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(99,102,241,0.35)] transition hover:brightness-105 disabled:opacity-50"
               >
                 Export PDF
               </button>
@@ -370,52 +358,52 @@ const TaxSummaryPage: React.FC = () => {
         </section>
 
         {warning ? (
-          <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm">
+          <section className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-200">
             <p className="text-sm font-medium">{warning}</p>
           </section>
         ) : null}
 
         {loading ? (
-          <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <SkeletonBlock className="h-32" />
             <SkeletonBlock className="h-32" />
             <SkeletonBlock className="h-32" />
           </section>
         ) : (
-          <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Total Tax Eligible</p>
-              <p className="mt-3 text-3xl font-bold text-slate-900">{formatCurrency(summary?.totalTaxEligibleAmount ?? 0)}</p>
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-2xl border border-[#2f4a78] bg-[#162746] p-5 shadow-[0_10px_24px_rgba(5,10,26,0.35)]">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Total Tax Eligible</p>
+              <p className="mt-3 text-2xl font-bold text-white">{formatCurrency(summary?.totalTaxEligibleAmount ?? 0)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Sections Used</p>
-              <p className="mt-3 text-3xl font-bold text-slate-900">{sectionsUsed}</p>
+            <div className="rounded-2xl border border-[#2f4a78] bg-[#162746] p-5 shadow-[0_10px_24px_rgba(5,10,26,0.35)]">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Sections Used</p>
+              <p className="mt-3 text-2xl font-bold text-white">{sectionsUsed}</p>
             </div>
-            <div className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Remaining Possible Savings</p>
-              <p className="mt-3 text-3xl font-bold text-slate-900">{formatCurrency(remainingPossibleSavings)}</p>
+            <div className="rounded-2xl border border-teal-800/70 bg-[#162746] p-5 shadow-[0_10px_24px_rgba(5,10,26,0.35)]">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Remaining Possible Savings</p>
+              <p className="mt-3 text-2xl font-bold text-teal-300">{formatCurrency(remainingPossibleSavings)}</p>
             </div>
           </section>
         )}
 
-        <section className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
-          {error ? <p className="text-red-600">{error}</p> : null}
+        <section className="rounded-2xl border border-[#294673] bg-[#101f3c] p-5">
+          {error ? <p className="text-rose-300">{error}</p> : null}
 
           {loading ? (
             <div className="grid gap-4 md:grid-cols-2">
-              <SkeletonBlock className="h-56" />
-              <SkeletonBlock className="h-56" />
+              <SkeletonBlock className="h-44" />
+              <SkeletonBlock className="h-44" />
             </div>
           ) : null}
 
           {!loading && !error && !warning && sections.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <p className="text-lg font-medium text-slate-900">No tax-eligible expenses found for {summary?.financialYear ?? year}</p>
+            <div className="rounded-xl border border-dashed border-[#3b5b90] bg-[#112447] p-8 text-center">
+              <p className="text-lg font-medium text-slate-100">No tax-eligible expenses found for {summary?.financialYear ?? year}</p>
             </div>
           ) : null}
 
           {!loading && !error && sections.length > 0 ? (
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               {sections.map((section) => (
                 <SectionCard
                   key={section.section}
@@ -429,17 +417,17 @@ const TaxSummaryPage: React.FC = () => {
         </section>
 
         {!loading && !error && !warning && sections.length > 0 ? (
-          <section className="grid gap-5 lg:grid-cols-2">
+          <section className="grid gap-4 lg:grid-cols-2">
             <SectionPieChart sections={sections} />
             <UtilizationTimelineChart timeline={timeline} />
           </section>
         ) : null}
 
         {selectedSection ? (
-          <section className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
+          <section className="rounded-2xl border border-[#294673] bg-[#101f3c] p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Section {selectedSection} Expense Drilldown</h3>
-              <span className="text-sm text-slate-500">{sectionExpenses.length} expenses</span>
+              <h3 className="text-lg font-semibold text-white">Section {selectedSection} Expense Drilldown</h3>
+              <span className="text-sm text-slate-400">{sectionExpenses.length} expenses</span>
             </div>
 
             {sectionLoading ? (
@@ -450,29 +438,28 @@ const TaxSummaryPage: React.FC = () => {
               </div>
             ) : null}
 
-            {sectionError ? <p className="text-sm text-red-600">{sectionError}</p> : null}
+            {sectionError ? <p className="text-sm text-rose-300">{sectionError}</p> : null}
 
             {!sectionLoading && !sectionError && sectionExpenses.length === 0 ? (
-              <p className="text-sm text-slate-600">No expenses found for this section.</p>
+              <p className="text-sm text-slate-400">No expenses found for this section.</p>
             ) : null}
 
             {!sectionLoading && !sectionError && sectionExpenses.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-600">
-                      <th className="py-2 text-left text-slate-500">Date</th>
-                      <th className="py-2 text-left text-slate-500">Merchant</th>
-                      <th className="py-2 text-left text-slate-500">Category</th>
-                      <th className="py-2 text-left text-slate-500">Payment</th>
-                      <th className="py-2 text-right text-slate-500">Amount</th>
+                    <tr className="border-b border-[#28436f] text-slate-400">
+                      <th className="py-2 text-left text-[11px] uppercase tracking-[0.15em]">Date</th>
+                      <th className="py-2 text-left text-[11px] uppercase tracking-[0.15em]">Merchant</th>
+                      <th className="py-2 text-left text-[11px] uppercase tracking-[0.15em]">Category</th>
+                      <th className="py-2 text-left text-[11px] uppercase tracking-[0.15em]">Payment</th>
+                      <th className="py-2 text-right text-[11px] uppercase tracking-[0.15em]">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sectionExpenses.map((expense) => (
-                      <tr key={expense.expenseId} className="border-b border-slate-100 text-slate-700">
+                      <tr key={expense.expenseId} className="border-b border-[#213a62] text-slate-200 hover:bg-[#19315a]">
                         <td className="py-2">{formatDateDDMMYYYY(expense.expenseDate)}</td>
-                        
                         <td className="py-2">{expense.merchant}</td>
                         <td className="py-2">{expense.categoryName ?? "N/A"}</td>
                         <td className="py-2">{expense.paymentMode}</td>

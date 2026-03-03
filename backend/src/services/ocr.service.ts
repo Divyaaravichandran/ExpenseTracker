@@ -13,7 +13,7 @@ export class OcrService {
         processedPath,
         "eng",
         {
-          tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+          tessedit_pageseg_mode: Tesseract.PSM.AUTO,
           preserve_interword_spaces: "1",
           user_defined_dpi: "300"
         } as any

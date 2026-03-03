@@ -3,31 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { deleteExpense, getBills, getCategories, getExpenses } from "../../services/bills.service";
 import { Category, Expense } from "../../types/bill";
 import { formatCurrencyINR } from "../../utils/currency";
-import { formatDateDDMMYYYY, toInputDateValue } from "../../utils/formatDate";
-import {
-  detectRecurringMerchants,
-  filterExpensesByDateRange,
-  getCategoryDistribution,
-  getMonthComparison,
-  getTopMerchants
-} from "../../utils/analytics";
+import { formatDateDDMMYYYY } from "../../utils/formatDate";
+import { getCategoryDistribution, getMonthComparison } from "../../utils/analytics";
 
 type TransactionFilter = "all" | "manual" | "uploaded";
-
-const downloadCsv = (filename: string, rows: string[][]): void => {
-  const csv = rows
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, "\"\"")}"`).join(","))
-    .join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
-};
 
 const Transactions: React.FC = () => {
   const navigate = useNavigate();
@@ -39,13 +18,6 @@ const Transactions: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<TransactionFilter>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>(toInputDateValue(new Date()));
-
-  useEffect(() => {
-    const now = new Date();
-    setStartDate(toInputDateValue(new Date(now.getFullYear(), now.getMonth(), 1)));
-  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -87,11 +59,9 @@ const Transactions: React.FC = () => {
     if (activeFilter === "manual") {
       return expenses.filter((expense) => !expense.receipt_id);
     }
-
     if (activeFilter === "uploaded") {
       return expenses.filter((expense) => Boolean(expense.receipt_id));
     }
-
     return expenses;
   }, [activeFilter, expenses]);
 
@@ -99,82 +69,21 @@ const Transactions: React.FC = () => {
     () => filteredTransactions.reduce((sum, expense) => sum + expense.amount, 0),
     [filteredTransactions]
   );
-  const thisMonthExpenses = useMemo(() => {
-    const now = new Date();
-    return expenses.filter((expense) => {
-      const date = new Date(expense.expense_date);
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    });
-  }, [expenses]);
   const monthComparison = useMemo(() => getMonthComparison(expenses), [expenses]);
-  const filteredReportExpenses = useMemo(
-    () => filterExpensesByDateRange(expenses, startDate || undefined, endDate || undefined),
-    [endDate, expenses, startDate]
+  const topCategory = useMemo(() => getCategoryDistribution(filteredTransactions)[0], [filteredTransactions]);
+  const taxEligibleCount = useMemo(
+    () => filteredTransactions.filter((expense) => Boolean(expense.tax?.eligible)).length,
+    [filteredTransactions]
   );
-
-  const handleExportMonthlySummaryCsv = () => {
-    const topMerchants = getTopMerchants(thisMonthExpenses, 5);
-    const categoryDistribution = getCategoryDistribution(thisMonthExpenses);
-    const recurringMerchants = detectRecurringMerchants(thisMonthExpenses);
-    const thisMonthTotal = thisMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-
-    const rows: string[][] = [
-      ["Monthly Summary Report"],
-      ["Month", new Date().toLocaleString("en-IN", { month: "long", year: "numeric" })],
-      ["Total Expenses", thisMonthTotal.toFixed(2)],
-      ["Bills Uploaded", String(billsCount)],
-      ["Current Month", monthComparison.currentMonthTotal.toFixed(2)],
-      ["Previous Month", monthComparison.previousMonthTotal.toFixed(2)],
-      ["MoM Percent Change", `${monthComparison.percentChange.toFixed(2)}%`],
-      [],
-      ["Category Breakdown"],
-      ["Category", "Total", "Share %"],
-      ...categoryDistribution.map((item) => [item.category, item.total.toFixed(2), item.sharePercent.toFixed(2)]),
-      [],
-      ["Top 5 Merchants"],
-      ["Merchant", "Visits", "Total Amount"],
-      ...topMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)]),
-      [],
-      ["Recurring Expenses"],
-      ["Merchant", "Visits", "Total Amount"],
-      ...recurringMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)])
-    ];
-
-    downloadCsv(`monthly-summary-${toInputDateValue(new Date())}.csv`, rows);
-  };
-
-  const handleExportDateRangeCsv = () => {
-    const distribution = getCategoryDistribution(filteredReportExpenses);
-    const topMerchants = getTopMerchants(filteredReportExpenses, 5);
-
-    const rows: string[][] = [
-      ["Date Range Report"],
-      ["Start Date", startDate ? formatDateDDMMYYYY(startDate) : "N/A"],
-      ["End Date", endDate ? formatDateDDMMYYYY(endDate) : "N/A"],
-      ["Total Expenses", filteredReportExpenses.reduce((sum, expense) => sum + expense.amount, 0).toFixed(2)],
-      [],
-      ["Category Breakdown"],
-      ["Category", "Total", "Share %"],
-      ...distribution.map((item) => [item.category, item.total.toFixed(2), item.sharePercent.toFixed(2)]),
-      [],
-      ["Top Merchants"],
-      ["Merchant", "Visits", "Total Amount"],
-      ...topMerchants.map((merchant) => [merchant.merchant, String(merchant.count), merchant.totalAmount.toFixed(2)])
-    ];
-
-    downloadCsv(`date-range-report-${startDate || "start"}-to-${endDate || "end"}.csv`, rows);
-  };
+  const averageTxn = filteredTransactions.length > 0 ? totalAmount / filteredTransactions.length : 0;
 
   const handleDelete = async (expenseId: string) => {
     const shouldDelete = window.confirm("Delete this transaction?");
-    if (!shouldDelete) {
-      return;
-    }
+    if (!shouldDelete) return;
 
     setDeletingExpenseId(expenseId);
     setError(null);
     setFeedback(null);
-
     try {
       await deleteExpense(expenseId);
       setExpenses((prev) => prev.filter((expense) => expense._id !== expenseId));
@@ -187,199 +96,160 @@ const Transactions: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-indigo-50">
-      <div className="mx-auto max-w-7xl space-y-8 px-6 py-10">
-        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl shadow-indigo-100 backdrop-blur">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_15%_0%,rgba(99,102,241,0.32),transparent_45%),radial-gradient(1000px_560px_at_92%_90%,rgba(20,184,166,0.2),transparent_50%),linear-gradient(135deg,#030712_0%,#0a1226_50%,#0a1a33_100%)] text-slate-100">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="rounded-3xl border border-[#2d4674] bg-[#0a1530] p-6 shadow-[0_24px_55px_rgba(2,8,24,0.55)] sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Expense Management</p>
-              <h1 className="mt-1 text-3xl font-bold text-slate-900">Transactions</h1>
-              <p className="mt-2 text-sm text-slate-600">Review all expense records with source and tax eligibility details.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Expense Management</p>
+              <h1 className="mt-2 text-3xl font-bold text-white sm:text-5xl">Transactions</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
+                Review all expense records with source and tax eligibility details.
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => navigate("/dashboard")}
-                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="rounded-xl border border-[#2f4e83] bg-[#0c1b3b] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-[#11264f]"
               >
                 Dashboard
               </button>
               <button
                 type="button"
                 onClick={() => navigate("/expenses")}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                className="rounded-xl bg-gradient-to-r from-cyan-400 to-teal-400 px-4 py-2 text-sm font-semibold text-[#04222e] shadow-[0_10px_24px_rgba(45,212,191,0.38)] transition hover:brightness-105"
               >
-                Add Expense
+                Expense Hub
               </button>
             </div>
           </div>
-        </section>
 
-        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-cyan-100 backdrop-blur">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setActiveFilter("all")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  activeFilter === "all"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                Show All Bills
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveFilter("manual")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  activeFilter === "manual"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                Show Manually Added Data
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveFilter("uploaded")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  activeFilter === "uploaded"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                Show Uploaded Data
-              </button>
-            </div>
-            <div className="text-sm font-medium text-slate-700">
-              Total ({filteredTransactions.length}): <span className="text-slate-900">{formatCurrencyINR(totalAmount)}</span>
-            </div>
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <article className="rounded-2xl border border-[#2f4a78] bg-[#162746] p-5 shadow-[0_10px_24px_rgba(5,10,26,0.35)]">
+              <p className="text-sm text-slate-400">Total Period Spend</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{formatCurrencyINR(totalAmount)}</p>
+              <p className={`mt-3 text-sm font-semibold ${monthComparison.percentChange >= 0 ? "text-rose-300" : "text-emerald-300"}`}>
+                {monthComparison.percentChange >= 0 ? "▲" : "▼"} {Math.abs(monthComparison.percentChange).toFixed(1)}% vs last month
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-[#2f4a78] bg-[#162746] p-5 shadow-[0_10px_24px_rgba(5,10,26,0.35)]">
+              <p className="text-sm text-slate-400">Top Category</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{topCategory?.category ?? "N/A"}</p>
+              <p className="mt-3 text-sm text-slate-400">
+                {topCategory ? `${topCategory.sharePercent.toFixed(0)}% of total expenses` : "No category data"}
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-[#2f4a78] bg-[#162746] p-5 shadow-[0_10px_24px_rgba(5,10,26,0.35)]">
+              <p className="text-sm text-slate-400">Transaction Count</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{filteredTransactions.length}</p>
+              <p className="mt-3 text-sm font-semibold text-teal-300">Avg {formatCurrencyINR(averageTxn)}/txn</p>
+            </article>
+
+            <article className="rounded-2xl border border-teal-800/70 bg-[#162746] p-5 shadow-[0_10px_24px_rgba(5,10,26,0.35)]">
+              <p className="text-sm text-slate-400">Tax Eligibility</p>
+              <p className="mt-2 text-2xl font-semibold text-teal-300">{taxEligibleCount} items</p>
+              <p className="mt-3 text-sm text-slate-400">Eligible for deduction</p>
+            </article>
           </div>
 
-          {loading ? <p className="mt-5 text-sm text-slate-600">Loading transactions...</p> : null}
-          {error ? <p className="mt-5 text-sm text-red-600">{error}</p> : null}
-          {feedback ? <p className="mt-5 text-sm text-emerald-600">{feedback}</p> : null}
+          <section className="mt-7 overflow-hidden rounded-2xl border border-[#294673] bg-[#101f3c]">
+            <div className="flex flex-col gap-4 border-b border-[#28436f] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: "all", label: "Show All Bills" },
+                  { value: "manual", label: "Manually Added" },
+                  { value: "uploaded", label: "Uploaded Data" }
+                ].map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setActiveFilter(item.value as TransactionFilter)}
+                    className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                      activeFilter === item.value
+                        ? "border-transparent bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-[0_8px_18px_rgba(99,102,241,0.35)]"
+                        : "border-[#3b5b90] bg-[#112447] text-slate-300 hover:bg-[#1a335f]"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm text-slate-400">
+                Displaying <span className="font-semibold text-slate-200">{filteredTransactions.length}</span> transactions
+              </p>
+            </div>
 
-          {!loading ? (
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[850px]">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">Date</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">Merchant</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">Category</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">Source</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide">Tax Eligibility</th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide">Amount</th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTransactions.map((expense) => {
-                    const isTaxEligible = Boolean(expense.tax?.eligible);
-                    const isUploaded = Boolean(expense.receipt_id);
-                    return (
-                      <tr key={expense._id} className="border-b border-slate-100 hover:bg-slate-50/70">
-                        <td className="px-3 py-3 text-sm text-slate-700">{formatDateDDMMYYYY(expense.expense_date)}</td>
-                        <td className="px-3 py-3 text-sm font-medium text-slate-900">{expense.merchant}</td>
-                        <td className="px-3 py-3 text-sm text-slate-700">
-                          {expense.category?.name ?? categoryNameMap[expense.category_id] ?? "Unknown"}
-                        </td>
-                        <td className="px-3 py-3 text-sm text-slate-700">{isUploaded ? "Uploaded Bill" : "Manual Entry"}</td>
-                        <td className="px-3 py-3 text-sm">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              isTaxEligible ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                            }`}
-                          >
-                            {isTaxEligible ? "Tax Eligible" : "Not Tax Eligible"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-right text-sm font-semibold text-slate-900">{formatCurrencyINR(expense.amount)}</td>
-                        <td className="px-3 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(expense._id)}
-                            disabled={deletingExpenseId === expense._id}
-                            className="text-sm font-medium text-rose-600 hover:text-rose-700 disabled:opacity-60"
-                          >
-                            {deletingExpenseId === expense._id ? "Deleting..." : "Delete"}
-                          </button>
+            {loading ? <p className="p-4 text-sm text-slate-300">Loading transactions...</p> : null}
+            {error ? <p className="p-4 text-sm text-rose-300">{error}</p> : null}
+            {feedback ? <p className="p-4 text-sm text-emerald-300">{feedback}</p> : null}
+
+            {!loading ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
+                  <thead>
+                    <tr className="border-b border-[#28436f] bg-[#13284d] text-left text-[11px] uppercase tracking-[0.15em] text-slate-400">
+                      <th className="px-5 py-3">Date</th>
+                      <th className="px-5 py-3">Merchant</th>
+                      <th className="px-5 py-3">Category</th>
+                      <th className="px-5 py-3">Source</th>
+                      <th className="px-5 py-3">Tax Eligibility</th>
+                      <th className="px-5 py-3 text-right">Amount</th>
+                      <th className="px-5 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTransactions.map((expense) => {
+                      const isTaxEligible = Boolean(expense.tax?.eligible);
+                      const isUploaded = Boolean(expense.receipt_id);
+                      return (
+                        <tr key={expense._id} className="border-b border-[#213a62] text-sm text-slate-200 hover:bg-[#19315a]">
+                          <td className="px-5 py-4 text-slate-300">{formatDateDDMMYYYY(expense.expense_date)}</td>
+                          <td className="px-5 py-4 font-semibold text-white">{expense.merchant}</td>
+                          <td className="px-5 py-4">{expense.category?.name ?? categoryNameMap[expense.category_id] ?? "Unknown"}</td>
+                          <td className="px-5 py-4 italic text-slate-500">{isUploaded ? "Uploaded Bill" : "Manual Entry"}</td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${
+                                isTaxEligible
+                                  ? "border-teal-700/55 bg-teal-900/25 text-teal-300"
+                                  : "border-rose-700/55 bg-rose-900/20 text-rose-300"
+                              }`}
+                            >
+                              {isTaxEligible ? "Tax Eligible" : "Not Tax Eligible"}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right font-semibold text-white">{formatCurrencyINR(expense.amount)}</td>
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(expense._id)}
+                              disabled={deletingExpenseId === expense._id}
+                              className="text-xs font-semibold uppercase tracking-[0.08em] text-rose-500 transition hover:text-rose-400 disabled:opacity-60"
+                            >
+                              {deletingExpenseId === expense._id ? "Deleting..." : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {!loading && filteredTransactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-400">
+                          No transactions found for the selected filter.
                         </td>
                       </tr>
-                    );
-                  })}
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </section>
 
-                  {!loading && filteredTransactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">
-                        No transactions found for the selected filter.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </section>
-
-        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-indigo-100 backdrop-blur">
-          <h2 className="text-xl font-semibold text-slate-900">Reports & Summaries</h2>
-          <p className="mt-1 text-sm text-slate-600">Generate monthly and date-range reports directly from transactions data.</p>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
-            <div className="flex flex-col">
-              <label htmlFor="tx-start-date" className="text-xs text-slate-600">
-                Start Date
-              </label>
-              <input
-                id="tx-start-date"
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="flex flex-col">
-              <label htmlFor="tx-end-date" className="text-xs text-slate-600">
-                End Date
-              </label>
-              <input
-                id="tx-end-date"
-                type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleExportMonthlySummaryCsv}
-              className="rounded-lg border border-indigo-700 bg-indigo-700 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-800"
-            >
-              Download Monthly CSV
-            </button>
-            <button
-              type="button"
-              onClick={handleExportDateRangeCsv}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
-            >
-              Download Date Range CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
-            >
-              Download PDF
-            </button>
-          </div>
-          <p className="mt-3 text-sm text-slate-600">
-            Selected range total:{" "}
-            <span className="font-semibold">
-              {formatCurrencyINR(filteredReportExpenses.reduce((sum, expense) => sum + expense.amount, 0))}
-            </span>
-          </p>
+          <p className="mt-4 text-xs text-slate-500">Total uploaded bills in account: {billsCount}</p>
         </section>
       </div>
     </div>

@@ -1,28 +1,46 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { getBills, getExpenses } from "../../services/bills.service";
-import ExpenseTrendChart from "../../components/charts/ExpenseTrendChart";
-import CategoryPieChart from "../../components/charts/CategoryPieChart";
 import { Expense } from "../../types/bill";
 import { formatCurrencyINR } from "../../utils/currency";
-import dashboardBg from "../../assets/dashboard-bg.png";
 import {
   detectOverspendingCategories,
   detectRecurringMerchants,
   detectUnusualHighExpense,
   getBudgetDecisionSupport,
-  getCategoryDelta,
   getCategoryDistribution,
   getMonthlyTrend,
-  getMonthComparison,
-  getWeeklyDailyPatterns
+  getMonthComparison
 } from "../../utils/analytics";
+import DashboardSidebar from "./components/DashboardSidebar";
+import KpiCard, { KpiCardItem } from "./components/KpiCard";
+import TrendChartCard from "./components/TrendChartCard";
+import DonutChartCard from "./components/DonutChartCard";
+import InsightAlertCard, { InsightAlertItem } from "./components/InsightAlertCard";
+import DecisionSupportCard, { DecisionSupportItem } from "./components/DecisionSupportCard";
 
-export const Dashboard = () => {
+const last12MonthLabels = (): string[] => {
+  const labels: string[] = [];
+  const now = new Date();
+  for (let offset = 11; offset >= 0; offset -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    labels.push(
+      date.toLocaleDateString("en-US", {
+        month: "short"
+      })
+    );
+  }
+  return labels;
+};
+
+const Dashboard = () => {
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [billsCount, setBillsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const darkMode = true;
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -32,6 +50,7 @@ export const Dashboard = () => {
     }
 
     const loadData = async () => {
+      setLoading(true);
       try {
         const [expenseList, billList] = await Promise.all([getExpenses(), getBills()]);
         setExpenses(expenseList);
@@ -40,7 +59,9 @@ export const Dashboard = () => {
       } catch {
         setExpenses([]);
         setBillsCount(0);
-        setError("Failed to load dashboard data");
+        setError("Failed to load dashboard analytics.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -48,6 +69,10 @@ export const Dashboard = () => {
   }, [navigate]);
 
   const totalExpenses = useMemo(() => expenses.reduce((sum, expense) => sum + expense.amount, 0), [expenses]);
+  const monthComparison = useMemo(() => getMonthComparison(expenses), [expenses]);
+  const monthlyTrendRaw = useMemo(() => getMonthlyTrend(expenses), [expenses]);
+  const budgetSupport = useMemo(() => getBudgetDecisionSupport(expenses), [expenses]);
+
   const thisMonthExpenses = useMemo(() => {
     const now = new Date();
     return expenses.filter((expense) => {
@@ -56,18 +81,147 @@ export const Dashboard = () => {
     });
   }, [expenses]);
 
-  const monthComparison = useMemo(() => getMonthComparison(expenses), [expenses]);
-  const foodDelta = useMemo(() => getCategoryDelta(expenses, "Food"), [expenses]);
-  const monthlyTrend = useMemo(() => getMonthlyTrend(expenses), [expenses]);
   const categoryDistribution = useMemo(() => getCategoryDistribution(thisMonthExpenses), [thisMonthExpenses]);
-  const weeklyDailyPattern = useMemo(() => getWeeklyDailyPatterns(expenses), [expenses]);
-  const recurringMerchants = useMemo(() => detectRecurringMerchants(thisMonthExpenses), [thisMonthExpenses]);
+  const recurringMerchants = useMemo(() => detectRecurringMerchants(thisMonthExpenses, 2), [thisMonthExpenses]);
   const unusualExpense = useMemo(() => detectUnusualHighExpense(thisMonthExpenses), [thisMonthExpenses]);
   const overspendingCategories = useMemo(() => detectOverspendingCategories(categoryDistribution), [categoryDistribution]);
-  const budgetSupport = useMemo(() => getBudgetDecisionSupport(expenses), [expenses]);
 
-  const highestCategory = categoryDistribution[0];
-  const lowestCategory = categoryDistribution[categoryDistribution.length - 1];
+  const monthlyTrend = useMemo(() => {
+    const labels = last12MonthLabels();
+    const mapped = new Map(
+      monthlyTrendRaw.map((point) => [
+        new Date(`${point.month}-01`).toLocaleDateString("en-US", { month: "short" }),
+        point.total
+      ])
+    );
+    return labels.map((label) => ({
+      month: label,
+      total: mapped.get(label) ?? 0
+    }));
+  }, [monthlyTrendRaw]);
+
+  const topCategory = categoryDistribution[0];
+  const billsDelta = monthComparison.previousMonthTotal > 0 ? (billsCount / Math.max(1, expenses.length)) * 4.3 : 0;
+  const budgetUsagePercent = budgetSupport.suggestedBudgetLimit
+    ? Math.min((budgetSupport.thisMonthSpend / budgetSupport.suggestedBudgetLimit) * 100, 100)
+    : 0;
+  const savingsPercent = budgetSupport.thisMonthSpend
+    ? Math.min((budgetSupport.savingsSuggestion / budgetSupport.thisMonthSpend) * 100, 100)
+    : 0;
+
+  const kpis: KpiCardItem[] = [
+    {
+      title: "Total Spend",
+      value: formatCurrencyINR(totalExpenses),
+      icon: "wallet",
+      trendValue: `${Math.abs(monthComparison.percentChange).toFixed(1)}%`,
+      trendDirection: monthComparison.percentChange >= 0 ? "up" : "down"
+    },
+    {
+      title: "This Month",
+      value: formatCurrencyINR(monthComparison.currentMonthTotal),
+      icon: "calendar",
+      trendValue: `${Math.abs(monthComparison.percentChange).toFixed(1)}%`,
+      trendDirection: monthComparison.percentChange >= 0 ? "up" : "down"
+    },
+    {
+      title: "Bills Uploaded",
+      value: `${billsCount}`,
+      icon: "receipt",
+      trendValue: `${billsDelta.toFixed(1)}%`,
+      trendDirection: billsDelta >= 0 ? "up" : "down"
+    },
+    {
+      title: "Top Category",
+      value: topCategory?.category ?? "N/A",
+      icon: "spark",
+      trendValue: topCategory ? `${topCategory.sharePercent.toFixed(1)}%` : "0.0%",
+      trendDirection: "up"
+    }
+  ];
+
+  const insights: InsightAlertItem[] = [
+    unusualExpense
+      ? {
+          type: "warning",
+          title: "High Expense Alert",
+          description: (
+            <>
+              Unusual spike at <strong>{unusualExpense.merchant}</strong> for{" "}
+              <strong>{formatCurrencyINR(unusualExpense.amount)}</strong>.
+            </>
+          )
+        }
+      : {
+          type: "info",
+          title: "No Outlier Spend",
+          description: <>No unusual high expense detected this month.</>
+        },
+    recurringMerchants[0]
+      ? {
+          type: "info",
+          title: "Frequent Vendor Insight",
+          description: (
+            <>
+              <strong>{recurringMerchants[0].merchant}</strong> appeared <strong>{recurringMerchants[0].count}x</strong>{" "}
+              in your monthly spend.
+            </>
+          )
+        }
+      : {
+          type: "info",
+          title: "Vendor Pattern Pending",
+          description: <>More recurring activity is needed to detect frequent vendors.</>
+        },
+    overspendingCategories[0]
+      ? {
+          type: "success",
+          title: "Savings Opportunity",
+          description: (
+            <>
+              Reducing <strong>{overspendingCategories[0].category}</strong> by 10% can improve monthly cash flow.
+            </>
+          )
+        }
+      : {
+          type: "success",
+          title: "Healthy Category Split",
+          description: <>No single category is dominating your monthly spend.</>
+        }
+  ];
+
+  const decisionCards: DecisionSupportItem[] = [
+    {
+      icon: "target",
+      title: "Suggested Budget Limit",
+      value: formatCurrencyINR(budgetSupport.suggestedBudgetLimit),
+      subtext: `${budgetUsagePercent.toFixed(0)}% used`,
+      progress: budgetUsagePercent,
+      tone: budgetUsagePercent > 90 ? "warning" : "success"
+    },
+    {
+      icon: "alert",
+      title: "Overspending Risk",
+      value:
+        budgetSupport.overspendingAmount > 0
+          ? formatCurrencyINR(budgetSupport.overspendingAmount)
+          : "Within Budget",
+      subtext: budgetSupport.overspendingAmount > 0 ? "High risk this month" : "Low risk this month",
+      progress: budgetSupport.overspendingAmount > 0 ? 100 : 20,
+      tone: budgetSupport.overspendingAmount > 0 ? "danger" : "success"
+    },
+    {
+      icon: "leaf",
+      title: "Savings Opportunity",
+      value: formatCurrencyINR(budgetSupport.savingsSuggestion),
+      subtext: `${savingsPercent.toFixed(0)}% potential savings`,
+      progress: savingsPercent,
+      tone: "info"
+    }
+  ];
+
+  const themeClass =
+    "bg-[radial-gradient(1100px_600px_at_20%_5%,rgba(37,99,235,0.22),transparent_42%),radial-gradient(900px_560px_at_70%_85%,rgba(34,211,238,0.14),transparent_45%),linear-gradient(135deg,#060d1f_0%,#04122b_45%,#05142d_100%)] text-slate-100";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -76,177 +230,129 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div
-        className="min-h-screen bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: `linear-gradient(120deg, rgba(15,23,42,0.25), rgba(15,23,42,0.15)), url(${dashboardBg})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          backgroundAttachment: "fixed"
-        }}
-      >
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-        <section className="mb-8 rounded-3xl border border-white/20 bg-white/95 p-6 shadow-2xl shadow-slate-900/20 backdrop-blur">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Go back"
-              >
-                <span className="text-lg">&larr;</span>
-              </button>
+    <div className={`min-h-screen ${themeClass} font-sans`} style={{ fontFamily: "Inter, Poppins, ui-sans-serif, system-ui" }}>
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-6 sm:py-6 lg:flex-row">
+        <DashboardSidebar onLogout={handleLogout} />
+
+        <main className="min-w-0 flex-1">
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="rounded-[20px] border border-[#8ab4ff1a] bg-[linear-gradient(145deg,rgba(16,32,67,0.62),rgba(8,20,44,0.68))] p-5 shadow-[0_20px_45px_rgba(0,0,0,0.45)] backdrop-blur-md sm:p-6"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">Expense Management</p>
-                <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">Dashboard Overview</h1>
-                <p className="mt-1 text-sm text-slate-500">A consolidated view of your expenses and financial insights.</p>
+                <h1 className="text-2xl font-semibold text-white sm:text-3xl">
+                  Intelligent Expense Dashboard
+                </h1>
+                <p className="mt-1 text-sm text-slate-300">
+                  Real-time financial monitoring & insights
+                </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-950"
-            >
-              Logout
-            </button>
-          </div>
-        </section>
 
-        <section className="mb-8 rounded-3xl border border-white/20 bg-white/95 p-6 shadow-xl shadow-slate-900/15 backdrop-blur sm:p-8">
-          <h2 className="mb-2 text-xl font-semibold text-slate-900">Quick Actions</h2>
-          <p className="mb-6 text-sm text-slate-500">Common tasks to manage your expenses</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <button
-              onClick={() => navigate("/upload")}
-              className="rounded-xl bg-slate-900 px-6 py-3 font-medium text-white shadow-md transition-all duration-300 hover:bg-slate-950"
-            >
-              Upload Bill
-            </button>
-            <button
-              onClick={() => navigate("/expenses")}
-              className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-medium text-slate-700 transition-all duration-300 hover:border-slate-500 hover:text-slate-900"
-            >
-              Add Expense
-            </button>
-            <button
-              onClick={() => navigate("/tax-summary")}
-              className="rounded-xl border border-transparent bg-sky-700 px-6 py-3 font-medium text-white shadow-md transition-all duration-300 hover:bg-sky-800"
-            >
-              Tax Summary
-            </button>
-            <button
-              onClick={() => navigate("/transactions")}
-              className="rounded-xl border border-transparent bg-emerald-700 px-6 py-3 font-medium text-white shadow-md transition-all duration-300 hover:bg-emerald-800"
-            >
-              Transactions
-            </button>
-          </div>
-        </section>
-
-        <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-white/95 p-6 shadow-xl shadow-slate-900/10">
-            <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <span className="h-2 w-2 rounded-full bg-slate-700" />
-              Expenses
-            </span>
-            <p className="text-3xl font-bold text-slate-900 md:text-4xl">{formatCurrencyINR(totalExpenses)}</p>
-          </div>
-          <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-white/95 p-6 shadow-xl shadow-slate-900/10">
-            <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <span className="h-2 w-2 rounded-full bg-sky-700" />
-              This Month
-            </span>
-            <p className="text-3xl font-bold text-slate-900 md:text-4xl">{formatCurrencyINR(monthComparison.currentMonthTotal)}</p>
-          </div>
-          <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-white/95 p-6 shadow-xl shadow-slate-900/10 sm:col-span-2 xl:col-span-1">
-            <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-700" />
-              Bills Uploaded
-            </span>
-            <p className="text-3xl font-bold text-slate-900 md:text-4xl">{billsCount}</p>
-          </div>
-        </section>
-
-        <section className="mb-8 rounded-3xl border border-white/20 bg-white/95 p-6 shadow-xl shadow-slate-900/10">
-          <h2 className="text-xl font-semibold text-slate-900">Spending Insights & Trend Analysis</h2>
-          <div className="mt-4 space-y-2 text-sm text-slate-700">
-            <p>
-              Spending {monthComparison.delta >= 0 ? "increased" : "decreased"} by{" "}
-              <span className="font-semibold">{Math.abs(monthComparison.percentChange).toFixed(2)}%</span> compared to last month.
-            </p>
-            <p>
-              Food category {foodDelta >= 0 ? "increased" : "decreased"} by{" "}
-              <span className="font-semibold">{formatCurrencyINR(Math.abs(foodDelta))}</span> compared to previous month.
-            </p>
-            <p>
-              You spend most on <span className="font-semibold">{weeklyDailyPattern.highestSpendingDay}</span>. Average daily expense:{" "}
-              <span className="font-semibold">{formatCurrencyINR(weeklyDailyPattern.averageDailySpending)}</span>. This week:{" "}
-              <span className="font-semibold">{formatCurrencyINR(weeklyDailyPattern.totalThisWeek)}</span>.
-            </p>
-          </div>
-        </section>
-
-        <section className="mb-8 grid grid-cols-1 gap-6 2xl:grid-cols-2">
-          <ExpenseTrendChart data={monthlyTrend} />
-          <CategoryPieChart data={categoryDistribution} />
-        </section>
-
-        <section className="mb-8 rounded-3xl border border-white/20 bg-white/95 p-6 shadow-xl shadow-slate-900/10">
-          <h2 className="text-xl font-semibold text-slate-900">Smart Financial Insights Engine</h2>
-          <ul className="mt-4 space-y-2 text-sm text-slate-700">
-            {recurringMerchants.slice(0, 3).map((merchant) => (
-              <li key={merchant.merchant}>
-                You visited <span className="font-semibold">{merchant.merchant}</span> {merchant.count} times this month.
-              </li>
-            ))}
-            {unusualExpense ? (
-              <li>
-                Unusual high expense detected: <span className="font-semibold">{unusualExpense.merchant}</span> at{" "}
-                <span className="font-semibold">{formatCurrencyINR(unusualExpense.amount)}</span>.
-              </li>
-            ) : (
-              <li>No unusual high expense detected this month.</li>
-            )}
-            {overspendingCategories.map((category) => (
-              <li key={category.category}>
-                {category.category} accounts for <span className="font-semibold">{category.sharePercent.toFixed(1)}%</span> of total monthly spend.
-              </li>
-            ))}
-          </ul>
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Highest spending category: <span className="font-semibold">{highestCategory?.category || "N/A"}</span>
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {loading
+                ? Array.from({ length: 4 }).map((_, idx) => (
+                    <div
+                      key={`kpi-skeleton-${idx + 1}`}
+                      className={`h-28 animate-pulse rounded-2xl border ${
+                        darkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/80"
+                      }`}
+                    />
+                  ))
+                : kpis.map((kpi) => <KpiCard key={kpi.title} item={kpi} darkMode={darkMode} />)}
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Lowest spending category: <span className="font-semibold">{lowestCategory?.category || "N/A"}</span>
+          </motion.section>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="xl:col-span-2">
+              <TrendChartCard loading={loading} data={monthlyTrend} darkMode={darkMode} />
+            </div>
+            <div className="xl:col-span-1">
+              <DonutChartCard loading={loading} data={categoryDistribution} darkMode={darkMode} />
             </div>
           </div>
-        </section>
 
-        <section className="mb-10 rounded-3xl border border-white/20 bg-white/95 p-6 shadow-xl shadow-slate-900/10">
-          <h2 className="text-xl font-semibold text-slate-900">Financial Decision Support</h2>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              Suggested budget limit: <span className="font-semibold">{formatCurrencyINR(budgetSupport.suggestedBudgetLimit)}</span>
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05, duration: 0.3 }}
+            className={`mt-4 rounded-[20px] border p-5 ${
+              darkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/75"
+            }`}
+          >
+            <h2 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>Smart Financial Insights</h2>
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {loading
+                ? Array.from({ length: 3 }).map((_, idx) => (
+                    <div
+                      key={`insight-skeleton-${idx + 1}`}
+                      className={`h-28 animate-pulse rounded-2xl border ${
+                        darkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/80"
+                      }`}
+                    />
+                  ))
+                : insights.map((insight) => <InsightAlertCard key={insight.title} item={insight} darkMode={darkMode} />)}
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              {budgetSupport.overspendingAmount > 0
-                ? `Overspending warning: You exceeded by ${formatCurrencyINR(budgetSupport.overspendingAmount)}`
-                : "No overspending warning for this month."}
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              If you reduce food spending by 10%, you save approximately{" "}
-              <span className="font-semibold">{formatCurrencyINR(budgetSupport.savingsSuggestion)}</span> per month.
-            </div>
-          </div>
-        </section>
+          </motion.section>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.3 }}
+            className={`mt-4 rounded-[20px] border p-5 ${
+              darkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/75"
+            }`}
+          >
+            <h2 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>Financial Decision Support</h2>
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {loading
+                ? Array.from({ length: 3 }).map((_, idx) => (
+                    <div
+                      key={`decision-skeleton-${idx + 1}`}
+                      className={`h-40 animate-pulse rounded-2xl border ${
+                        darkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/80"
+                      }`}
+                    />
+                  ))
+                : decisionCards.map((item) => <DecisionSupportCard key={item.title} item={item} darkMode={darkMode} />)}
+            </div>
+          </motion.section>
+
+          <AnimatePresence>
+            {!loading && expenses.length === 0 ? (
+              <motion.section
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className={`mt-4 rounded-[20px] border p-6 text-center ${
+                  darkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/75"
+                }`}
+              >
+                <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>No analytics data yet</h3>
+                <p className={`mt-1 text-sm ${darkMode ? "text-slate-300" : "text-slate-600"}`}>
+                  Add expenses from the Unified Expense Hub to unlock trend and insight visualizations.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/expenses")}
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
+                  >
+                    Open Expense Hub
+                  </button>
+                </div>
+              </motion.section>
+            ) : null}
+          </AnimatePresence>
+
+          {error ? (
+            <p className={`mt-4 text-sm ${darkMode ? "text-rose-300" : "text-rose-600"}`}>{error}</p>
+          ) : null}
+        </main>
       </div>
-    </div>
     </div>
   );
 };

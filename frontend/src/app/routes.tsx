@@ -8,6 +8,7 @@ import UploadBill from "../pages/upload/UploadBill";
 import Expenses from "../pages/expenses/Expenses";
 import TaxSummaryPage from "../pages/tax/TaxSummaryPage";
 import Transactions from "../pages/transactions/Transactions";
+import Reports from "../pages/reports/Reports";
 
 export const AppRoutes = () => (
   <BrowserRouter>
@@ -20,6 +21,7 @@ export const AppRoutes = () => (
       <Route path="/expenses" element={<Expenses />} />
       <Route path="/transactions" element={<Transactions />} />
       <Route path="/tax-summary" element={<TaxSummaryPage />} />
+      <Route path="/reports" element={<Reports />} />
     </Routes>
   </BrowserRouter>
 );
