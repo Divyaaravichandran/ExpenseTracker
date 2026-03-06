@@ -248,6 +248,7 @@ export const getBudgetDecisionSupport = (expenses: Expense[]): {
   thisMonthSpend: number;
   overspendingAmount: number;
   savingsSuggestion: number;
+  savingsCategory: string;
 } => {
   const now = new Date();
   const thisMonthSpend = expenses
@@ -273,19 +274,28 @@ export const getBudgetDecisionSupport = (expenses: Expense[]): {
   const suggestedBudgetLimit = Number((averageLast3Months * 0.95 || thisMonthSpend).toFixed(2));
   const overspendingAmount = Number(Math.max(thisMonthSpend - suggestedBudgetLimit, 0).toFixed(2));
 
-  const foodTotal = expenses
+  const thisMonthExpenses = expenses
     .filter((expense) => {
       const date = new Date(expense.expense_date);
-      const category = getCategoryName(expense).toLowerCase();
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear() && category === "food";
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     })
-    .reduce((sum, expense) => sum + expense.amount, 0);
-  const savingsSuggestion = Number((foodTotal * 0.1).toFixed(2));
+    .filter((expense) => expense.amount > 0);
+
+  const categoryTotals = new Map<string, number>();
+  thisMonthExpenses.forEach((expense) => {
+    const category = getCategoryName(expense);
+    categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + expense.amount);
+  });
+
+  const [savingsCategory, topCategoryTotal] =
+    Array.from(categoryTotals.entries()).sort((a, b) => b[1] - a[1])[0] ?? ["N/A", 0];
+  const savingsSuggestion = Number((topCategoryTotal * 0.1).toFixed(2));
 
   return {
     suggestedBudgetLimit,
     thisMonthSpend: Number(thisMonthSpend.toFixed(2)),
     overspendingAmount,
-    savingsSuggestion
+    savingsSuggestion,
+    savingsCategory
   };
 };

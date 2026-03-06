@@ -6,6 +6,7 @@ export class OcrService {
   static async extractText(imagePath: string): Promise<string> {
     let processedPath: string | null = null;
     const keepProcessedImage = process.env.OCR_KEEP_PROCESSED_IMAGE === "true";
+    const fastMode = process.env.OCR_FAST_MODE !== "false";
 
     try {
       processedPath = await ImagePreprocessService.preprocessImage(imagePath);
@@ -13,9 +14,9 @@ export class OcrService {
         processedPath,
         "eng",
         {
-          tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+          tessedit_pageseg_mode: fastMode ? Tesseract.PSM.SPARSE_TEXT : Tesseract.PSM.AUTO,
           preserve_interword_spaces: "1",
-          user_defined_dpi: "300"
+          user_defined_dpi: fastMode ? "220" : "300"
         } as any
       );
 

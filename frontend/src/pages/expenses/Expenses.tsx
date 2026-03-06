@@ -290,7 +290,7 @@ const Expenses = () => {
   const apiBaseUrl = ((import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL || "http://localhost:4000");
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(1200px_620px_at_10%_5%,rgba(99,102,241,0.28),transparent_52%),radial-gradient(1000px_520px_at_90%_95%,rgba(20,184,166,0.18),transparent_50%),linear-gradient(140deg,#020617_0%,#111827_100%)] text-slate-100">
+    <div className="app-page-bg">
       {topPopup ? (
         <div className="fixed left-1/2 top-5 z-50 w-[min(92vw,520px)] -translate-x-1/2">
           <div
@@ -304,17 +304,13 @@ const Expenses = () => {
           </div>
         </div>
       ) : null}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className={cardClass}>
+      <div className="app-page-shell">
+        <section className="app-page-panel sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-300">Expense Manager</p>
-              <h1 className="mt-2 text-3xl font-semibold">Unified Expense Hub</h1>
-              <p className="mt-2 text-sm text-slate-300">Upload bill and manual expense entry are now combined in one flow.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => navigate("/dashboard")} className="rounded-xl border border-slate-600 bg-slate-800/60 px-4 py-2 text-sm">Dashboard</button>
-              <button type="button" onClick={() => navigate("/transactions")} className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white">Transactions</button>
+              <p className="app-page-eyebrow">Expense Manager</p>
+              <h1 className="app-page-title">Unified Expense Hub</h1>
+              <p className="app-page-subtitle">Upload bill and manual expense entry are now combined in one flow.</p>
             </div>
           </div>
           {pageError ? <p className="mt-4 text-sm text-rose-200">{pageError}</p> : null}

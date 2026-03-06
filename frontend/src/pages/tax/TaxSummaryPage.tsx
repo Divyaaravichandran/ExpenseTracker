@@ -300,9 +300,9 @@ const TaxSummaryPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_15%_0%,rgba(99,102,241,0.32),transparent_45%),radial-gradient(1000px_560px_at_92%_90%,rgba(20,184,166,0.2),transparent_50%),linear-gradient(135deg,#030712_0%,#0a1226_50%,#0a1a33_100%)] text-slate-100">
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        <section className="rounded-3xl border border-[#2d4674] bg-[#0a1530] p-6 shadow-[0_24px_55px_rgba(2,8,24,0.55)] sm:p-8">
+    <div className="app-page-bg">
+      <div className="app-page-shell space-y-6">
+        <section className="app-page-panel sm:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
               <button
@@ -314,9 +314,9 @@ const TaxSummaryPage: React.FC = () => {
                 <span className="text-base">&larr;</span>
               </button>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Tax Planner</p>
-                <h1 className="text-3xl font-bold tracking-tight text-white">Tax Saving Summary</h1>
-                <p className="mt-2 text-sm text-slate-300">Identify potentially claimable expenses for income tax filing.</p>
+                <p className="app-page-eyebrow">Tax Planner</p>
+                <h1 className="app-page-title">Tax Saving Summary</h1>
+                <p className="app-page-subtitle">Identify potentially claimable expenses for income tax filing.</p>
               </div>
             </div>
             <div className="w-full md:w-64">

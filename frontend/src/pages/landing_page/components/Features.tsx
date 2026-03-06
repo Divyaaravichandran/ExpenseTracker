@@ -150,7 +150,7 @@ export const Features = () => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.5 }}
-        className="text-3xl md:text-4xl font-bold text-slate-900 text-center mb-4"
+        className="mb-4 text-center text-3xl font-bold text-white md:text-4xl"
       >
         Everything you need
       </motion.h2>
@@ -159,7 +159,7 @@ export const Features = () => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="text-slate-500 text-center max-w-2xl mx-auto mb-16"
+        className="mx-auto mb-16 max-w-2xl text-center text-slate-300"
       >
         Powerful features to track, analyze, and optimize your spending.
       </motion.p>
@@ -175,13 +175,13 @@ export const Features = () => {
             key={index}
             variants={item}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="p-8 rounded-2xl bg-white shadow-md hover:-translate-y-2 hover:shadow-lg transition-all duration-300"
+            className="rounded-2xl border border-[#8ab4ff1f] bg-[linear-gradient(145deg,rgba(12,27,58,0.62),rgba(7,18,40,0.7))] p-8 shadow-[0_20px_45px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:border-[#8ab4ff33]"
           >
-            <div className="text-blue-600 mb-4">{feature.icon}</div>
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">
+            <div className="mb-4 text-cyan-300">{feature.icon}</div>
+            <h3 className="mb-2 text-xl font-semibold text-white">
               {feature.title}
             </h3>
-            <p className="text-slate-500">{feature.description}</p>
+            <p className="text-slate-300">{feature.description}</p>
           </motion.article>
         ))}
       </motion.div>

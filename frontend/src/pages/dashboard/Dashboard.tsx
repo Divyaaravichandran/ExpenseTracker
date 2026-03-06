@@ -13,7 +13,6 @@ import {
   getMonthlyTrend,
   getMonthComparison
 } from "../../utils/analytics";
-import DashboardSidebar from "./components/DashboardSidebar";
 import KpiCard, { KpiCardItem } from "./components/KpiCard";
 import TrendChartCard from "./components/TrendChartCard";
 import DonutChartCard from "./components/DonutChartCard";
@@ -176,7 +175,7 @@ const Dashboard = () => {
     overspendingCategories[0]
       ? {
           type: "success",
-          title: "Savings Opportunity",
+          title: "Spend Optimization Signal",
           description: (
             <>
               Reducing <strong>{overspendingCategories[0].category}</strong> by 10% can improve monthly cash flow.
@@ -212,43 +211,32 @@ const Dashboard = () => {
     },
     {
       icon: "leaf",
-      title: "Savings Opportunity",
+      title: "Top Category Reduction Potential",
       value: formatCurrencyINR(budgetSupport.savingsSuggestion),
-      subtext: `${savingsPercent.toFixed(0)}% potential savings`,
+      subtext:
+        budgetSupport.savingsCategory !== "N/A"
+          ? `${savingsPercent.toFixed(0)}% potential savings by trimming ${budgetSupport.savingsCategory} by 10%`
+          : `${savingsPercent.toFixed(0)}% potential savings`,
       progress: savingsPercent,
       tone: "info"
     }
   ];
 
-  const themeClass =
-    "bg-[radial-gradient(1100px_600px_at_20%_5%,rgba(37,99,235,0.22),transparent_42%),radial-gradient(900px_560px_at_70%_85%,rgba(34,211,238,0.14),transparent_45%),linear-gradient(135deg,#060d1f_0%,#04122b_45%,#05142d_100%)] text-slate-100";
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    navigate("/login", { replace: true });
-  };
-
   return (
-    <div className={`min-h-screen ${themeClass} font-sans`} style={{ fontFamily: "Inter, Poppins, ui-sans-serif, system-ui" }}>
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-6 sm:py-6 lg:flex-row">
-        <DashboardSidebar onLogout={handleLogout} />
-
+    <div className="app-page-bg font-sans" style={{ fontFamily: "Inter, Poppins, ui-sans-serif, system-ui" }}>
+      <div className="app-page-shell flex flex-col gap-4 sm:gap-6">
         <main className="min-w-0 flex-1">
           <motion.section
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="rounded-[20px] border border-[#8ab4ff1a] bg-[linear-gradient(145deg,rgba(16,32,67,0.62),rgba(8,20,44,0.68))] p-5 shadow-[0_20px_45px_rgba(0,0,0,0.45)] backdrop-blur-md sm:p-6"
+            className="app-page-panel backdrop-blur-md sm:p-8"
           >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-semibold text-white sm:text-3xl">
-                  Intelligent Expense Dashboard
-                </h1>
-                <p className="mt-1 text-sm text-slate-300">
-                  Real-time financial monitoring & insights
-                </p>
+                <p className="app-page-eyebrow">Intelligent Expense & Bill Management Platform</p>
+                <h1 className="app-page-title">Expense Dashboard</h1>
+                <p className="app-page-subtitle">Real-time financial monitoring & insights</p>
               </div>
             </div>
 

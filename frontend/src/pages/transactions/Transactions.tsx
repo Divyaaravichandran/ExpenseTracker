@@ -96,32 +96,16 @@ const Transactions: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_15%_0%,rgba(99,102,241,0.32),transparent_45%),radial-gradient(1000px_560px_at_92%_90%,rgba(20,184,166,0.2),transparent_50%),linear-gradient(135deg,#030712_0%,#0a1226_50%,#0a1a33_100%)] text-slate-100">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="rounded-3xl border border-[#2d4674] bg-[#0a1530] p-6 shadow-[0_24px_55px_rgba(2,8,24,0.55)] sm:p-8">
+    <div className="app-page-bg">
+      <div className="app-page-shell">
+        <section className="app-page-panel sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Expense Management</p>
-              <h1 className="mt-2 text-3xl font-bold text-white sm:text-5xl">Transactions</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
+              <p className="app-page-eyebrow">Expense Management</p>
+              <h1 className="app-page-title">Transactions</h1>
+              <p className="app-page-subtitle sm:text-base">
                 Review all expense records with source and tax eligibility details.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => navigate("/dashboard")}
-                className="rounded-xl border border-[#2f4e83] bg-[#0c1b3b] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-[#11264f]"
-              >
-                Dashboard
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/expenses")}
-                className="rounded-xl bg-gradient-to-r from-cyan-400 to-teal-400 px-4 py-2 text-sm font-semibold text-[#04222e] shadow-[0_10px_24px_rgba(45,212,191,0.38)] transition hover:brightness-105"
-              >
-                Expense Hub
-              </button>
             </div>
           </div>
 

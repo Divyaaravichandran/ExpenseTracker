@@ -31,7 +31,7 @@ export const HowItWorks = () => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.5 }}
-        className="text-3xl md:text-4xl font-bold text-slate-900 text-center mb-4"
+        className="mb-4 text-center text-3xl font-bold text-white md:text-4xl"
       >
         How It Works
       </motion.h2>
@@ -40,12 +40,12 @@ export const HowItWorks = () => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="text-slate-500 text-center max-w-2xl mx-auto mb-16"
+        className="mx-auto mb-16 max-w-2xl text-center text-slate-300"
       >
         Get started in four simple steps.
       </motion.p>
       <div className="relative">
-        <div className="hidden lg:block absolute top-12 left-0 right-0 h-0.5 bg-slate-200" style={{ left: '12.5%', right: '12.5%' }} aria-hidden />
+        <div className="absolute left-0 right-0 top-12 hidden h-0.5 bg-[#294673] lg:block" style={{ left: "12.5%", right: "12.5%" }} aria-hidden />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-4">
           {steps.map((step, index) => (
             <motion.div
@@ -56,15 +56,15 @@ export const HowItWorks = () => {
               transition={{ duration: 0.5, delay: index * 0.1, ease: "easeOut" }}
               className="relative flex flex-col items-center text-center"
             >
-              <div className="w-24 h-24 rounded-full bg-white border-2 border-blue-500 shadow-lg flex items-center justify-center mb-4 relative z-10">
-                <span className="text-2xl font-bold text-blue-600">
+              <div className="relative z-10 mb-4 flex h-24 w-24 items-center justify-center rounded-full border-2 border-cyan-400 bg-[#0f2246] shadow-[0_12px_24px_rgba(0,0,0,0.35)]">
+                <span className="text-2xl font-bold text-cyan-300">
                   {step.number}
                 </span>
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-white">
                 {step.title}
               </h3>
-              <p className="text-slate-500 text-sm">{step.description}</p>
+              <p className="text-sm text-slate-300">{step.description}</p>
             </motion.div>
           ))}
         </div>

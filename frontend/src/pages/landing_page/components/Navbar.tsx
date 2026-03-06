@@ -13,12 +13,12 @@ export const Navbar = () => {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeInOut" }}
-      className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-slate-200"
+      className="sticky top-0 z-50 border-b border-[#8ab4ff1a] bg-[linear-gradient(145deg,rgba(16,32,67,0.62),rgba(8,20,44,0.68))] backdrop-blur-md"
     >
       <nav className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link
           to="/"
-          className="text-xl font-bold text-slate-900 transition duration-300 hover:opacity-80"
+          className="text-xl font-bold text-white transition duration-300 hover:opacity-80"
           aria-label="ExpenseAI home"
         >
           ExpenseAI
@@ -28,7 +28,7 @@ export const Navbar = () => {
             <li key={href}>
               <a
                 href={href}
-                className="text-slate-600 hover:text-slate-900 transition duration-300"
+                className="text-slate-300 hover:text-white transition duration-300"
               >
                 {label}
               </a>
@@ -38,13 +38,13 @@ export const Navbar = () => {
         <div className="flex items-center gap-3">
           <Link
             to="/login"
-            className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:border-slate-400 hover:scale-105 transition-all duration-300"
+            className="rounded-xl border border-[#2f4e83] bg-[#0c1b3b] px-4 py-2 text-slate-100 transition hover:bg-[#11264f]"
           >
             Login
           </Link>
           <Link
             to="/signup"
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 transition-all duration-300"
+            className="rounded-xl bg-gradient-to-r from-cyan-400 to-teal-400 px-4 py-2 font-semibold text-[#04222e] shadow-[0_10px_24px_rgba(45,212,191,0.38)] transition hover:brightness-105"
           >
             Sign Up
           </Link>

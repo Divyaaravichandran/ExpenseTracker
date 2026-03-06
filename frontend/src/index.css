@@ -1,3 +1,64 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100vh;
+  background: #030712;
+}
+
+body {
+  margin: 0;
+}
+
+.app-page-bg {
+  min-height: 100vh;
+  background: radial-gradient(1200px 600px at 15% 0%, rgba(99, 102, 241, 0.32), transparent 45%),
+    radial-gradient(1000px 560px at 92% 90%, rgba(20, 184, 166, 0.2), transparent 50%),
+    linear-gradient(135deg, #030712 0%, #0a1226 50%, #0a1a33 100%);
+  color: #f1f5f9;
+}
+
+.app-page-shell {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 2rem 1rem;
+}
+
+.app-page-panel {
+  border-radius: 1.5rem;
+  border: 1px solid #2d4674;
+  background: #0a1530;
+  padding: 1.5rem;
+  box-shadow: 0 24px 55px rgba(2, 8, 24, 0.55);
+}
+
+.app-page-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+}
+
+.app-page-title {
+  margin-top: 0.5rem;
+  font-size: clamp(1.9rem, 2.5vw, 3rem);
+  font-weight: 700;
+  color: #fff;
+}
+
+.app-page-subtitle {
+  margin-top: 0.5rem;
+  max-width: 42rem;
+  font-size: 0.95rem;
+  color: #cbd5e1;
+}
+
+@media (min-width: 640px) {
+  .app-page-shell {
+    padding: 2rem 1.5rem;
+  }
+}

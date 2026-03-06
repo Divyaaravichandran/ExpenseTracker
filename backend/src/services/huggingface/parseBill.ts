@@ -107,8 +107,31 @@ const getHfClient = (): HfInference => {
   return new HfInference(getHfToken());
 };
 
+const runWithTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`Timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+};
+
 const extractAmount = (rawText: string): number | null => {
   const strongKeywords = [
+    "final amount",
+    "final total",
+    "amount paid",
+    "total paid",
+    "net payable",
+    "payable amount",
     "grand total",
     "total amount",
     "amount payable",
@@ -133,6 +156,9 @@ const extractAmount = (rawText: string): number | null => {
     "rate",
     "mrp",
     "discount",
+    "round off",
+    "rounding",
+    "change",
     "cgst",
     "sgst",
     "igst",
@@ -181,6 +207,12 @@ const extractAmount = (rawText: string): number | null => {
       if (token.includes(".")) {
         score += 1;
       }
+      if (/(subtotal|sub total)/i.test(lowerLine)) {
+        score -= 3;
+      }
+      if (lineIndex >= Math.floor(lines.length * 0.55)) {
+        score += 1;
+      }
 
       scoredCandidates.push({ value, score, lineIndex });
     }
@@ -218,18 +250,16 @@ interface NEREntity {
   word: string;
 }
 
-const getMerchant = (entities: NEREntity[] | undefined, rawText: string): string => {
-  const nerMerchant = entities
-    ?.filter((e) => e.entity_group === "ORG")
-    .map((e) => e.word.replace(/##/g, ""))
-    .join(" ");
+const getMerchant = (rawText: string): string => {
+  const noiseRegex =
+    /(invoice|bill|tax|gst|phone|mobile|tel|receipt|cash memo|date|time|qty|price|total|amount|payment)/i;
+  const lines = rawText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 3 && !/^\d+$/.test(line));
 
-  if (nerMerchant && nerMerchant.length > 5) {
-    return nerMerchant;
-  }
-
-  const lines = rawText.split("\n").filter((l) => l.trim().length > 2);
-  return lines[0] ? lines[0].trim() : "Unknown Merchant";
+  const candidate = lines.find((line) => !noiseRegex.test(line) && /[a-z]/i.test(line)) ?? lines[0];
+  return candidate || "Unknown Merchant";
 };
 
 const toIsoDate = (year: number, month: number, day: number): string | null => {
@@ -290,7 +320,7 @@ const parseMonthNameDateToken = (token: string): string | null => {
     dec: 12
   };
 
-  const compact = token.replace(/,/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  const compact = token.replace(/[,\-\/]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
   const parts = compact.split(" ");
   if (parts.length !== 3) {
     return null;
@@ -321,7 +351,7 @@ const extractDate = (rawText: string): string | null => {
   const weakDateHintRegex = /\b(date|dt)\b/i;
   const negativeDateHintRegex = /(due\s*date|expiry|exp(?:iry)?|mfg|valid\s*till)\b/i;
   const numericRegex = /\b(\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}|\d{1,2}\s+\d{1,2}\s+\d{2,4})\b/g;
-  const monthNameRegex = /\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})\b/g;
+  const monthNameRegex = /\b(\d{1,2}[\s/-]+[A-Za-z]{3,9}[\s/-]+\d{2,4}|[A-Za-z]{3,9}[\s/-]+\d{1,2},?[\s/-]+\d{2,4})\b/g;
 
   const parseFromText = (text: string): string[] => {
     const candidates: string[] = [];
@@ -381,60 +411,45 @@ const extractDate = (rawText: string): string | null => {
 };
 
 export async function parseBill(rawText: string): Promise<ParsedBillResult> {
-  try {
-    const hf = getHfClient();
-    const [classification, entities] = await Promise.all([
-      hf.zeroShotClassification({
-        model: "facebook/bart-large-mnli",
-        inputs: rawText,
-        parameters: { candidate_labels: BILL_CATEGORIES }
-      }),
-      hf.tokenClassification({
-        model: "dslim/bert-base-NER",
-        inputs: rawText
-      })
-    ]);
+  const keywordMatch = getKeywordCategoryMatch(rawText);
+  let category = keywordMatch?.category ?? "Other";
+  let categoryConfidence = keywordMatch?.confidence ?? "0.35";
 
-    let category = "Other";
-    let categoryConfidence = "0";
+  // Keep parsing fast by skipping HF classification when deterministic keyword match exists.
+  if (!keywordMatch) {
+    try {
+      const hf = getHfClient();
+      const classification = await runWithTimeout(
+        hf.zeroShotClassification({
+          model: "facebook/bart-large-mnli",
+          inputs: rawText.slice(0, 2200),
+          parameters: { candidate_labels: BILL_CATEGORIES }
+        }),
+        Number(process.env.HF_PARSE_TIMEOUT_MS || 2500)
+      );
 
-    if (Array.isArray(classification) && classification.length > 0) {
-      const first = classification[0] as { label?: string; score?: number };
-      category = first.label ?? "Other";
-      categoryConfidence = Number(first.score ?? 0).toFixed(2);
-    } else {
-      const clsObj = classification as { labels?: string[]; scores?: number[] };
-      if (Array.isArray(clsObj.labels) && clsObj.labels.length > 0) {
-        category = String(clsObj.labels[0]);
-        categoryConfidence = Number(clsObj.scores?.[0] ?? 0).toFixed(2);
+      if (Array.isArray(classification) && classification.length > 0) {
+        const first = classification[0] as { label?: string; score?: number };
+        category = first.label ?? "Other";
+        categoryConfidence = Number(first.score ?? 0).toFixed(2);
+      } else {
+        const clsObj = classification as { labels?: string[]; scores?: number[] };
+        if (Array.isArray(clsObj.labels) && clsObj.labels.length > 0) {
+          category = String(clsObj.labels[0]);
+          categoryConfidence = Number(clsObj.scores?.[0] ?? 0).toFixed(2);
+        }
       }
+    } catch (error) {
+      console.warn("HF classification skipped/fallback used:", (error as Error).message);
     }
-
-    const keywordMatch = getKeywordCategoryMatch(rawText);
-    const finalCategory = keywordMatch?.category ?? category;
-    const finalConfidence = keywordMatch?.confidence ?? categoryConfidence;
-
-    return {
-      category: finalCategory,
-      categoryConfidence: finalConfidence,
-      merchant: getMerchant(entities as NEREntity[], rawText),
-      date: extractDate(rawText),
-      amount: extractAmount(rawText),
-      rawText
-    };
-  } catch (error) {
-    console.error("HuggingFace parseBill failed:", error);
-    const keywordMatch = getKeywordCategoryMatch(rawText);
-    const fallbackCategory = keywordMatch?.category ?? "Other";
-    const fallbackConfidence = keywordMatch?.confidence ?? "0.35";
-
-    return {
-      category: fallbackCategory,
-      categoryConfidence: fallbackConfidence,
-      merchant: getMerchant(undefined, rawText),
-      date: extractDate(rawText),
-      amount: extractAmount(rawText),
-      rawText
-    };
   }
+
+  return {
+    category,
+    categoryConfidence,
+    merchant: getMerchant(rawText),
+    date: extractDate(rawText),
+    amount: extractAmount(rawText),
+    rawText
+  };
 }

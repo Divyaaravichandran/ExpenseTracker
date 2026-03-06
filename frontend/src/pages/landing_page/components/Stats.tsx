@@ -59,19 +59,19 @@ export const Stats = () => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.5 }}
-        className="bg-white rounded-2xl shadow-lg p-12 md:p-16"
+        className="rounded-2xl border border-[#8ab4ff1f] bg-[linear-gradient(145deg,rgba(12,27,58,0.62),rgba(7,18,40,0.7))] p-12 shadow-[0_20px_45px_rgba(0,0,0,0.35)] md:p-16"
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
           {stats.map((stat, index) => (
             <div key={index}>
-              <p className="text-5xl font-bold text-blue-600 mb-2">
+              <p className="mb-2 text-5xl font-bold text-cyan-300">
                 <AnimatedCounter
                   end={stat.end}
                   suffix={stat.suffix}
                   inView={inView}
                 />
               </p>
-              <p className="text-slate-500 font-medium">{stat.label}</p>
+              <p className="font-medium text-slate-300">{stat.label}</p>
             </div>
           ))}
         </div>
