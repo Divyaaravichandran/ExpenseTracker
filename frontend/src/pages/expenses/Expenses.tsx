@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../api/axios";
 import {
   addManualExpense,
   confirmBill,
@@ -287,8 +288,6 @@ const Expenses = () => {
     }
   };
 
-  const apiBaseUrl = ((import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL || "http://localhost:4000");
-
   return (
     <div className="app-page-bg">
       {topPopup ? (
@@ -384,7 +383,7 @@ const Expenses = () => {
                 <span className={`rounded-full border px-3 py-1 ${taxEligible ? "border-teal-400/40 bg-teal-500/10 text-teal-100" : "border-slate-400/40 bg-slate-500/10 text-slate-200"}`}>Tax Eligible: {taxEligible ? "Yes" : "No"}</span>
               </div>
             </div>
-            {uploadPreview.imageUrl ? <img src={`${apiBaseUrl}${uploadPreview.imageUrl}`} alt="Uploaded bill" className="mt-4 max-h-80 w-full rounded-2xl border border-slate-700 bg-slate-900/60 object-contain" /> : null}
+            {uploadPreview.imageUrl ? <img src={`${API_BASE_URL}${uploadPreview.imageUrl}`} alt="Uploaded bill" className="mt-4 max-h-80 w-full rounded-2xl border border-slate-700 bg-slate-900/60 object-contain" /> : null}
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="flex flex-col gap-1"><label htmlFor="parsed-merchant" className="text-sm">Merchant</label><input id="parsed-merchant" type="text" value={parsedForm.merchant} onChange={(event) => setParsedForm((prev) => ({ ...prev, merchant: event.target.value }))} className={inputClass} /></div>
               <div className="flex flex-col gap-1"><label htmlFor="parsed-amount" className="text-sm">Amount</label><input id="parsed-amount" type="number" min="0.01" step="0.01" value={parsedForm.amount > 0 ? parsedForm.amount : ""} onChange={(event) => setParsedForm((prev) => ({ ...prev, amount: Number(event.target.value) || 0 }))} className={inputClass} /></div>

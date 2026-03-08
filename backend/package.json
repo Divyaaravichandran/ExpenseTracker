@@ -4,9 +4,10 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-    "worker:dev": "ts-node-dev --respawn --transpile-only -r dotenv/config ../worker/src/main.ts",
+    "worker:dev": "ts-node-dev --respawn --transpile-only -r dotenv/config src/worker/main.ts",
     "build": "tsc",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "worker:start": "node dist/worker/main.js"
   },
   "keywords": [],
   "author": "",

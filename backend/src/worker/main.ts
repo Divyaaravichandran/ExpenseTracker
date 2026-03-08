@@ -1,7 +1,8 @@
-import { connectToDatabase } from "../../backend/src/libs/core/db";
-import { env } from "../../backend/src/libs/core/env";
-import { logger } from "../../backend/src/libs/core/logger";
-import { processNextPendingJob } from "../../backend/src/modules/jobs/jobs.worker.service";
+import "dotenv/config";
+import { connectToDatabase } from "../libs/core/db";
+import { env } from "../libs/core/env";
+import { logger } from "../libs/core/logger";
+import { processNextPendingJob } from "../modules/jobs/jobs.worker.service";
 
 const sleep = async (ms: number): Promise<void> =>
   new Promise((resolve) => {
