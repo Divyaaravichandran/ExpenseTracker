@@ -4,8 +4,9 @@ const env = (import.meta as ImportMeta & {
   env: { VITE_API_URL?: string; VITE_API_BASE_URL?: string };
 }).env;
 
+// ❌ DO NOT force /api globally
 export const API_BASE_URL =
-  env.VITE_API_URL || env.VITE_API_BASE_URL || "/api";
+  env.VITE_API_URL || env.VITE_API_BASE_URL || "";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
