@@ -5,7 +5,7 @@ const env = (import.meta as ImportMeta & {
 }).env;
 
 export const API_BASE_URL =
-  env.VITE_API_URL || env.VITE_API_BASE_URL || "http://18.209.216.82:4000";
+  env.VITE_API_URL || env.VITE_API_BASE_URL || "/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
