@@ -1,12 +1,15 @@
 import axios from "axios";
 
 const env = (import.meta as ImportMeta & {
-  env: { VITE_API_URL?: string; VITE_API_BASE_URL?: string };
+  env: { MODE: string; VITE_API_URL?: string; VITE_API_BASE_URL?: string };
 }).env;
 
-// ❌ DO NOT force /api globally
+// Do not force `/api` globally; some deployments use `/v1/*`.
 export const API_BASE_URL =
-  env.VITE_API_URL || env.VITE_API_BASE_URL || "";
+  env.VITE_API_URL?.trim() ||
+  env.VITE_API_BASE_URL?.trim() ||
+  // In production we default to same-origin so Nginx/ALB can proxy `/auth/*`, `/api/*`, `/v1/*` to the backend.
+  (env.MODE === "production" ? "/" : "http://localhost:4000");
 
 const api = axios.create({
   baseURL: API_BASE_URL,
