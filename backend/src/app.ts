@@ -40,6 +40,10 @@ app.use("/api/v1/expenses", expensesRoutes);
 app.use("/api/v1/jobs", jobsRouter);
 app.use("/api/v1/reports", reportsRouter);
 app.use("/api/v1/tax-rules", taxRulesRouter);
+// Back-compat: some deployments/proxies drop the `/api` prefix.
+app.use("/v1/bills", billsRoutes);
+app.use("/v1/expenses", expensesRoutes);
+app.use("/v1/jobs", jobsRouter);
 app.use("/v1/reports", reportsRouter);
 app.use("/v1/tax-rules", taxRulesRouter);
 app.use(notFound);
