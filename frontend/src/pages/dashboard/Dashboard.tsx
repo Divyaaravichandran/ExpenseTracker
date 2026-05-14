@@ -104,6 +104,8 @@ const Dashboard = () => {
   const budgetUsagePercent = budgetSupport.suggestedBudgetLimit
     ? Math.min((budgetSupport.thisMonthSpend / budgetSupport.suggestedBudgetLimit) * 100, 100)
     : 0;
+  const hasExpenseRecords = expenses.length > 0;
+  const overspendingRiskPercent = hasExpenseRecords ? budgetUsagePercent : 0;
   const savingsPercent = budgetSupport.thisMonthSpend
     ? Math.min((budgetSupport.savingsSuggestion / budgetSupport.thisMonthSpend) * 100, 100)
     : 0;
@@ -202,12 +204,26 @@ const Dashboard = () => {
       icon: "alert",
       title: "Overspending Risk",
       value:
-        budgetSupport.overspendingAmount > 0
+        !hasExpenseRecords
+          ? "0%"
+          : budgetSupport.overspendingAmount > 0
           ? formatCurrencyINR(budgetSupport.overspendingAmount)
           : "Within Budget",
-      subtext: budgetSupport.overspendingAmount > 0 ? "High risk this month" : "Low risk this month",
-      progress: budgetSupport.overspendingAmount > 0 ? 100 : 20,
-      tone: budgetSupport.overspendingAmount > 0 ? "danger" : "success"
+      subtext: !hasExpenseRecords
+        ? "Add expenses to start calculating risk."
+        : budgetSupport.overspendingAmount > 0
+          ? "High risk this month"
+          : overspendingRiskPercent >= 90
+            ? "Near budget limit"
+            : "Within budget",
+      progress: overspendingRiskPercent,
+      tone: !hasExpenseRecords
+        ? "info"
+        : budgetSupport.overspendingAmount > 0
+          ? "danger"
+          : overspendingRiskPercent >= 90
+            ? "warning"
+            : "success"
     },
     {
       icon: "leaf",
